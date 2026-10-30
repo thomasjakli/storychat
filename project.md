@@ -1,6 +1,6 @@
 # Self-hosted Character Stories — Project Specification
 
-Status: Planning complete enough for a feasibility prototype; application implementation and live provider validation have not started.
+Status: Milestone 1 complete for personal, single-user ChatGPT provider feasibility. Local sign-in, inference, renewal, revocation, and offline checks passed. Android application development and personal Docker deployment remain ahead.
 Last reviewed: 2026-10-30.
 
 This document describes the intended product and acceptance criteria. **Confirmed** requirements come from the owner. **Proposed** choices remain implementation recommendations. **Unverified** integration assumptions need a live test. Documentation notes are dated research, not proof of account access.
@@ -11,19 +11,21 @@ Build an Android-first interactive storytelling application in which fictional c
 
 The central outcome is a character who can continue a story in a later session using accurate, inspectable memories from earlier sessions. A large catalog of secondary features is not required to demonstrate that outcome.
 
-The initial deployment serves the owner and their family. The source repository may be public; running instances, accounts, conversations, credentials, and personal assets remain private. Publishing source does not imply operating a public service.
+The deployment serves only its owner. It uses one instance-wide ChatGPT connection for that same owner; family access and multiple app users are outside the current scope. The source repository may be public; running instances, accounts, conversations, credentials, and personal assets remain private. Publishing source does not imply operating a public service.
 
 ## 2. Confirmed requirements
 
 - Prioritize Android use.
-- Restrict the initial deployment to authorized family users.
+- Restrict the deployment to its sole owner. Require owner authentication for remote access; no public registration or family-user onboarding.
 - Use the owner's existing Docker infrastructure, available on a local network and a VPS, with Cloudflare Tunnel as the preferred ingress. The initial host, hostname, and policy remain open.
 - Support durable character memories and evolving relationships, with user inspection and correction.
 - Make all application features available without in-app payment. No currency, payment processing, premium tiers, paid replies, paid memory slots, or paid unlocks.
 - Treat external subscriptions and hosting costs separately from application feature access. Display provider limits as availability constraints, never as an upsell.
-- Prefer the owner's existing ChatGPT allowance where an officially supported integration permits it. Eligibility, family use, and deployment compatibility remain unverified.
+- Configure one owner-managed ChatGPT provider connection for the whole deployment instance. All requests arise from the owner's own activity (latest owner clarification, 2026-10-30).
+- Proceed with the owner's existing ChatGPT allowance through the tested supported sign-in route. No separately billed API or provider fallback is enabled.
 - Allow cloud inference and self-hosted storage; offline-only operation is not required.
 - Provide independent controls for tone, narrative detail, and response length.
+- Agents have creative freedom over the UI. Supplied private screenshots may inform broad interaction and atmosphere, but the interface must be an original design rather than a one-to-one reproduction (owner clarification, 2026-10-30).
 
 ## 3. Delivery and architecture — proposed
 
@@ -31,13 +33,15 @@ Start with an installable progressive web app (PWA), an application server, one 
 
 The server handles user authorization, story persistence, context assembly, model requests, and validated state updates. A provider adapter isolates authentication, available models, streaming, capabilities, and usage reporting. Story logic must not depend on one vendor's request format.
 
+Only one owner-managed ChatGPT connection is active per instance. Keep credentials server-side, bound concurrency and context growth, and isolate each story's context. The owner is both the application user and administrator. No multi-user service or credential sharing is required. The adapter boundary and fake provider remain useful for tests; no additional production provider is needed.
+
 Use a deterministic fake provider for ordinary development and automated tests. Label sample responses and demonstrations clearly. A fake-provider demonstration does not establish subscription eligibility or live-model quality.
 
 Select the frontend framework, backend runtime, and database after the initial integration spike. SQLite is a candidate for a single server with modest writes; PostgreSQL is an alternative if concurrency or deployment needs justify it. A vector database, separate job service, and distributed deployment are not prerequisites.
 
 ### Android experience
 
-- Target Android Chrome first; check other family-used browsers separately.
+- Target Android Chrome first; check other browsers used by the owner separately.
 - Provide a manifest with a stable app ID, name, start URL, scope, standalone display, and appropriate icons. Serve the deployment over trusted HTTPS.
 - Provide installation instructions that also work when the browser does not offer an install prompt. Store publication is not required.
 - Make long messages, narrow screens, text contrast, touch controls, keyboard resizing, and scrolling comfortable.
@@ -47,7 +51,15 @@ Select the frontend framework, backend runtime, and database after the initial i
 
 ## 4. Core product scope
 
-Start with one user, one character, and one story. Expand to family access after the continuity loop works.
+### Visual direction and design autonomy
+
+The agents may choose layout, typography, palette, navigation, and component styling without waiting for a detailed visual brief. Use a coherent, original visual direction suited to character storytelling. Private reference screenshots may inspire broad ideas such as illustrated character cards, immersive reading, or accessible memory panels; do not trace their screens, copy distinctive compositions, or reuse third-party branding, artwork, icons, or character text.
+
+Milestone 2 needs a usable Android-focused interface for character/persona setup, conversation, independent writing controls, and memory inspection/correction. Prioritize legibility, comfortable scrolling and composing, and clear generation/error states. Establish a consistent visual foundation without expanding into a full discovery catalog or polishing deferred features. Show a working preview when available and incorporate feedback while continuing independent implementation. Routine visual choices do not require prior approval.
+
+The public application must build and run without the private screenshots. Use original or appropriately licensed assets and synthetic character content. This design freedom does not change milestone acceptance criteria or authorize deployment changes.
+
+Start with one user, one character, and one story. Add more independent stories and characters after the continuity loop works; retain single-user access.
 
 ### Characters and player personas
 
@@ -55,8 +67,8 @@ Start with one user, one character, and one story. Expand to family access after
 - Upload an optional portrait and chat background.
 - Define the player's fictional persona separately from account identity, with a name, pronouns, appearance, background, and relevant story facts.
 - Snapshot/version the character definition and persona used by a story. Later library edits must not silently change established history.
-- For the family MVP, support creating, editing, duplicating, archiving, and deleting characters, with personal or family-shared visibility.
-- Sharing a character definition does not share a user's story or relationship with it.
+- For the personal MVP, support creating, editing, duplicating, archiving, and deleting characters in the owner's private library.
+- Reusing a character in a new story creates independent memory and relationship state.
 
 ### Conversation
 
@@ -151,15 +163,15 @@ Model output and imported data may propose only known operations over permitted 
 
 ### Preferred route and feasibility gate
 
-Evaluate official subscription-authorized access for the owner's existing ChatGPT plan. Before committing to this route, establish account eligibility, application/deployment scope, supported onboarding, available models, capability limits, credential renewal/revocation, and authorization for each family user.
+Use the supported ChatGPT sign-in route for the sole owner, as verified in milestone 1. The provider choice is settled. Keep inference limited to that owner's activity. Desktop-assisted sign-in is the verified onboarding path; use the documented same-owner host procedure when preparing a personal Docker deployment. [Same-owner host guidance](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms).
 
-A successful desktop login alone does not prove Android onboarding or family-hosted eligibility. Do not use browser-session scraping, credentials extracted from unrelated applications, or undocumented service endpoints.
+Successful local sign-in does not by itself verify phone-only onboarding or an actual Docker/Android deployment. Do not use browser-session scraping, credentials extracted from unrelated applications, or undocumented service endpoints.
 
 Keep separately billed APIs and self-hosted models possible behind adapters. Neither is an automatic fallback. Explain external costs and obtain the owner's selection before enabling a paid route. No provider choice creates an application premium tier.
 
 ### Dated research notes — revalidate before implementation
 
-Official documentation was reviewed on 2026-10-30. No live request has been performed for this project.
+Official documentation was rechecked on 2026-10-30. The owner completed local authorization; account catalog discovery, one structured model reply, credential renewal, and confirmed revocation succeeded. See the [milestone status](docs/milestone-1-status.md) for live evidence and remaining gates. This verifies personal access for the tested request, not unlimited usage or a deployed Android application.
 
 - The documented subscription flow targets eligible local/open-source uses and directs remotely hosted offerings to an access process; a public repository does not by itself establish eligibility. [Integration scope](https://developers.openai.com/siwc/token-sharing-open-source).
 - Dynamic registration specifies a loopback callback with PKCE, state, and nonce validation. A remote web backend cannot assume an arbitrary HTTPS callback or that a PWA can open a local listener. [Registration](https://developers.openai.com/siwc/token-sharing-open-source/sign-in).
@@ -175,22 +187,23 @@ Do not expose controls based on unsupported API fields or invent a remaining-all
 - Preserve drafts and story data when allowance or provider access is unavailable.
 - Bound retries, repair attempts, background work, and context growth.
 - Avoid unnecessary model calls; evaluate combining narrative and state output if reliable and supported.
+- Enforce provider concurrency/context limits at instance level while isolating the owner's separate story contexts.
 - Never silently activate paid usage.
 - Hosting, storage, electricity, and external inference/media may still cost money. No measured savings estimate is established.
 
 ## 8. Accounts, storage, and data ownership
 
-- Invite-only accounts, no public registration or discovery.
-- Enforce ownership server-side for stories, messages, state, assets, exports, and model connections.
-- Separate family-library sharing from story access and credentials.
-- App login and provider authorization are different permissions; one person's subscription is not assumed to cover other users.
+- One owner account, no public registration, invites, family accounts, or discovery.
+- Enforce ownership server-side for stories, messages, state, assets, and exports. Restrict the instance provider connection and credentials to administrators.
+- Keep the personal character library separate from each story's state and provider credentials.
+- Application login and provider authorization both belong to the sole owner. Keep browser app sessions separate from protected provider credentials.
 - Avoid implying end-to-end encryption: a server administrator may have technical access to stored content.
-- Provide versioned, validated character/story exports and compatible imports for the family MVP. Exclude credentials and deployment secrets.
+- Provide versioned, validated character/story exports and compatible imports for the personal MVP. Exclude credentials and deployment secrets.
 - Support deletion with documented consequences for linked memories, assets, and retained backups.
 - Bound upload sizes, accepted types, and imported document sizes. Render text or a restricted markup subset; arbitrary scripts/HTML are outside the MVP.
 - Minimize logs of conversation content and keep secrets out of source, frontend bundles, exports, and diagnostics.
 
-Initial entities: user/session; model connection and credential reference; versioned character/persona; story/participant; message/generation attempt; scene/state revision; fact/memory/source reference; correction/deletion suppression; open thread; relationship change; summary; media asset. Saved-scene collections can follow later.
+Initial entities: user/session/administrator role; instance provider configuration and credential reference; versioned character/persona; story/participant; message/generation attempt; scene/state revision; fact/memory/source reference; correction/deletion suppression; open thread; relationship change; summary; media asset. Saved-scene collections can follow later.
 
 ## 9. Docker deployment
 
@@ -200,7 +213,7 @@ Docker and Cloudflare Tunnel are the confirmed deployment baseline for the owner
 - Use one active deployment and authoritative database initially. Keep the image portable between local and VPS hosts; two available hosts do not imply active-active replication.
 - Reuse an existing tunnel connector where practical. Do not require a new hosting service or paid infrastructure.
 - Route a selected HTTPS hostname to the application, keeping database/internal service ports off public interfaces. Configure the connector-to-origin protocol for its actual network path and validate certificates where HTTPS is used. [Tunnel setup](https://developers.cloudflare.com/tunnel/get-started/).
-- Configure family access explicitly. Tunnel transport does not by itself create an Access allow policy. Validate Access tokens at the origin or connector when relying on Access protection; do not trust arbitrary identity headers. Preserve per-user application authorization. [Access guidance](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/).
+- Configure owner-only access explicitly. Tunnel transport does not by itself create an Access allow policy. Validate Access tokens at the origin or connector when relying on Access protection; do not trust arbitrary identity headers. Preserve per-user application authorization. [Access guidance](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/).
 - Test streaming and recovery through the actual hostname, tunnel, and sessions. Exclude private API/story responses from edge caching.
 - Keep tunnel tokens, provider credentials, and application encryption keys outside version control and ordinary story exports.
 - Back up database and media consistently. If using SQLite, use a supported live-backup method rather than blindly copying a live file. Test restoration separately from credential recovery. [SQLite backups](https://sqlite.org/backup.html).
@@ -218,6 +231,10 @@ Application authentication, Cloudflare access, and provider authorization remain
 - Inject failure cases with a fake provider rather than exhausting real allowance.
 - If subscription access is unavailable, record the outcome and present alternatives before enabling a different route.
 
+Implementation update, 2026-10-30: a dependency-free local CLI in `prototype/` implements supported loopback sign-in, per-account model discovery, renewable credentials, revocation, SSE handling, and a source-linked structured probe. Credentials are encrypted with a separately protected key; no API-key fallback or automatic inference loop exists. Independent QA passed 48 deterministic tests on Windows using Node 24.22.1, including owner-only ACL checks and real loopback callbacks with synthetic provider responses. Protected runtime tests require execution outside the managed sandbox; ACLs were not weakened.
+
+The owner completed browser consent. Eight models were discovered; a single `gpt-6.1-sol` probe returned a short reply and an intention linked to its supplied message ID, passing strict schema validation. Forced credential renewal and provider-confirmed revocation succeeded, and local renewable tokens were cleared. The latest scope is solely the owner's personal use, which matches the tested local path. **Milestone 1 is complete for personal provider feasibility.** Same-owner VM handoff, Docker operation, Android UI, and Tunnel behavior remain deployment work; no such deployment is claimed. The local Docker daemon is unavailable. Detailed evidence: [verification](docs/milestone-1-verification.md), [hosting assessment](docs/milestone-1-hosting.md), [current status](docs/milestone-1-status.md).
+
 ### Milestone 2: One-character continuity prototype
 
 - Start a story from a character/persona definition on Android.
@@ -228,10 +245,10 @@ Application authentication, Cloudflare access, and provider authorization remain
 - Demonstrate inspectable inner thoughts and relationship development grounded in events.
 - Persist independent tone/detail/length controls without resetting state or changing the provider/model.
 
-### Milestone 3: Family MVP and deployment
+### Milestone 3: Personal MVP and deployment
 
-- Deliver character/persona management, personal/family library visibility, and invite-only users.
-- Verify that two users sharing a character cannot access each other's stories, assets, memories, or model connections.
+- Deliver character/persona management, private library access, and owner authentication.
+- Verify unauthorized access is blocked, separate stories do not leak context, and provider credentials are never exposed to browser sessions. Verify bounded request concurrency.
 - Verify retry, concurrency, interruption, latest-turn editing/regeneration, export/import, and restored backups.
 - Install/launch from an Android home screen; check real-device keyboard, scroll, background/reconnect, logout, and account-switch behavior.
 - Deploy through the selected Docker/tunnel route and verify allow/deny behavior, origin protection, streaming, session expiry, and data preservation during container replacement.
@@ -257,19 +274,19 @@ Keep third-party application packages, screenshots, extracted code/resources, pr
 
 Ignore rules are an aid against accidental additions, not an audit of previously committed content. Before publication, inspect staged files and existing history. Only original source and approved documentation belong in public commits; publishing those files does not publish a running instance or private research.
 
-Repository name, application identity, and source license remain owner decisions. Public source availability and private family access are compatible but are separate choices.
+The source repository is `thomasjakli/storychat`. Final application identity and source license remain owner decisions. Public source availability and private personal access are compatible but are separate choices; visibility alone is not an open-source license or proof of provider eligibility.
 
 ## 13. Open decisions
 
 - Initial local or VPS host, OS/CPU architecture, storage paths, and backup destination.
 - Application hostname, tunnel connector, Access policy, and app login method.
-- Supported subscription onboarding and eligibility for this deployment/account; acceptable alternative if unavailable.
-- Family users and each user's provider authorization.
+- Personal Docker host and secure same-owner session-handoff implementation; ChatGPT is the selected provider.
+- Owner login method and instance concurrency/context limits. Multi-user access is outside the current scope.
 - Acceptance of PWA delivery for the first release.
 - Interface language and original initial character/story; support German story text without deriving a UI-language requirement from private examples.
 - Framework/runtime/database choice after feasibility work.
 - Default writing-control options and settings.
-- Public repository name, app identity, and license before publication.
+- Final app identity and source license; the public repository already exists, but no license has been selected.
 
 Do not turn unanswered preferences into confirmed requirements. Implementation choices may be resolved pragmatically within the agreed scope; live account consent and external spending decisions require the owner's involvement.
 

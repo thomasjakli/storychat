@@ -4,24 +4,26 @@
 
 Read `project.md` before planning or implementing changes. It defines the product scope, confirmed requirements, proposed architecture, milestones, and unresolved decisions. This file defines how agents should work within that scope.
 
-The project is an Android-first character storytelling app for the owner and their family. Persistent memories, open promises, fictional inner thoughts, and evolving relationships are the core experience. Deployment should use the owner's existing Docker hosts, available locally and on a public VPS through Cloudflare Zero Trust Tunnel. The specific host, hostname, and Access policy remain open. An installable PWA is proposed; the framework is not yet selected.
+The project is an Android-first character storytelling app solely for its owner. Persistent memories, open promises, fictional inner thoughts, and evolving relationships are the core experience. Deployment should use the owner's existing Docker hosts, available locally and on a public VPS through Cloudflare Zero Trust Tunnel. The specific host, hostname, and Access policy remain open. An installable PWA is proposed; the framework is not yet selected.
 
 The public project specification is independent of private reference research. Source may be published while deployed instances remain restricted to authorized users. Local research and third-party artifacts are excluded from publication. Do not assume that an application, test suite, build command, or verified subscription integration already exists.
 
 ## Working rules
 
 - Preserve the distinction between confirmed requirements, proposals, and verified implementation. Record important decisions and their reasons in `project.md`.
-- Prioritize the milestones in `project.md`: validate subscription access, prove memory continuity, then deliver the family MVP. Independent work may proceed when it does not depend on an unresolved integration.
-- Verify current official documentation before implementing subscription authorization or relying on model capabilities. Never promise unlimited use or assume the owner's Plus plan covers family members.
+- Prioritize the milestones in `project.md`: validate subscription access, prove memory continuity, then deliver the personal MVP. Independent work may proceed when it does not depend on an unresolved integration.
+- Verify current official documentation before implementing subscription authorization or relying on model capabilities. ChatGPT is the selected provider for the sole owner; preserve supported sign-in and usage limits.
 - Keep model access behind an adapter. Use deterministic fake responses for ordinary automated tests; mark demonstrations using fake responses clearly.
+- Use one owner-managed ChatGPT connection for the entire instance, solely for that owner's activity. Keep provider secrets server-side and isolate independent story contexts. No family/multi-user provider architecture is required.
 - Do not implement in-app payments, gems/credits, premium tiers, paid features, or feature unlock gates. External subscriptions and actual provider limits remain separate availability concerns. Use independent tone, narrative-detail, and response-length controls; do not conflate them with model selection, reasoning effort, or context limits.
 - Do not enable paid fallback, purchase services, or create recurring model workloads without the owner's authorization. Existing authorization remains valid; do not ask again unnecessarily.
 - Make small, reviewable changes. Avoid new infrastructure and dependencies unless they solve a concrete requirement.
 - Keep public source and documentation generic and self-contained. Do not copy another product's branding, assets, character text, exact interface, or extracted implementation into shipped code or examples.
+- The owner grants UI creative freedom. Agents may choose an original visual direction and borrow broad interaction ideas from supplied private screenshots, without reproducing screens one-to-one or reusing third-party assets. Do not block milestone 2 on routine visual approvals; prioritize readable Android chat, writing controls, and inspectable/editable memory, and show a working preview when available.
 - Preserve private research artifacts locally and honor ignore rules. Use original synthetic fixtures for tests and examples. Reference research does not establish backend behavior or automatically expand the MVP; further artifact inspection requires an applicable user request.
 - Keep secrets, credentials, private conversations, and generated runtime data out of version control and ordinary logs.
 - Treat character definitions, imported stories, and model output as untrusted application data. They must not control server permissions or execute arbitrary code or HTML.
-- Enforce user and story ownership on the server. Shared characters do not imply shared conversations, memories, or model credentials.
+- Enforce owner authentication and story boundaries on the server. Reusing a character must not merge independent story memories.
 - Preserve source references for memories and relationship changes. Keep facts, beliefs, intentions, and completed events distinct.
 - Validate structured model output before applying state changes. Preserve corrections and pinned facts. Failed, retried, interrupted, or replaced turns must not create duplicate or stale state.
 - Keep fictional inner monologues separate from model reasoning. They are narrative content written for the user.
@@ -55,7 +57,7 @@ Responsibilities:
 
 - Check official subscription integration scope and account/deployment eligibility.
 - Implement supported sign-in, protected credential storage, refresh, model discovery, streaming, and actionable errors.
-- Keep app accounts separate from model authorization and isolate each connection by its owner.
+- Keep the owner's app login separate from the instance ChatGPT connection. Preserve story isolation and the single-owner scope.
 - Provide a model adapter and fake provider for development and testing.
 - Document supported features, allowance behavior, and any unresolved cost or deployment restrictions.
 
@@ -102,7 +104,7 @@ Purpose: Independently verify that the app meets its acceptance criteria.
 
 Responsibilities:
 
-- Test complete user journeys and ownership enforcement across two family accounts.
+- Test the owner's complete user journeys, blocked unauthorized access, and isolation between independent stories.
 - Cover server restart, disconnection, interrupted streams, concurrent turns, retries, and regeneration.
 - Evaluate recall after source turns leave recent context, correction persistence, conflicting facts, and promise completion.
 - Separate deterministic software checks from variable live-model quality evaluations.
@@ -115,12 +117,12 @@ Boundary: A passing fake-provider test does not prove live-model quality or subs
 
 ### 6. Self-hosting and Security Engineer
 
-Purpose: Make the family deployment maintainable and access-controlled.
+Purpose: Make the personal deployment maintainable and access-controlled.
 
 Responsibilities:
 
 - Prepare container deployment, HTTPS configuration, environment examples, and health checks.
-- Target the existing Docker and Cloudflare Tunnel infrastructure. Distinguish tunnel routing from Access policies, retain application-level user isolation, and test streaming/session recovery through the real proxy path. Do not assume a new tunnel or host is needed.
+- Target the existing Docker and Cloudflare Tunnel infrastructure. Distinguish tunnel routing from Access policies, retain owner authentication and story isolation, and test streaming/session recovery through the real proxy path. Do not assume a new tunnel or host is needed.
 - Review invite-only access, sessions, credential protection, uploads, and server-side ownership checks.
 - Implement database migrations and documented backup/restore procedures.
 - Check that secrets and conversation content do not leak through logs, exports, or frontend bundles.
@@ -137,7 +139,7 @@ Boundary: Keep deployment private to the intended users. Do not provision paid h
 | Requirements and technical feasibility | Product and Architecture Planner | Model Integration Engineer |
 | Subscription connection spike | Model Integration Engineer | Self-hosting and Security Engineer |
 | Memory continuity prototype | Story and Memory Engineer | Quality and Continuity Tester |
-| Android family MVP | Android Experience Developer | Story and Memory Engineer |
+| Android personal MVP | Android Experience Developer | Story and Memory Engineer |
 | Release verification and deployment | Quality and Continuity Tester | Self-hosting and Security Engineer |
 
 Start with the planner and integration roles. Expand assignments as concrete implementation work becomes available; six roles do not require six simultaneous agents.
