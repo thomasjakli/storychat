@@ -59,13 +59,29 @@ test('Linux SIGKILL releases helper-held lock and preserves persistent lock inod
   assert.equal((await stat(path)).ino,inode); await recovered.release();
 });
 
-test('Linux SIGTERM drains a real server and allows immediate same-database restart', {skip:process.platform!=='linux'}, async t=>{
+test('Linux SIGTERM drains a real server and allows immediate same-database restart', {skip:process.platform!=='linux',timeout:40000}, async t=>{
   const db=join(await directory(t),'stories','story.sqlite');
-  const child=spawn(process.execPath,[fileURLToPath(new URL('../server.mjs',import.meta.url))],{env:{...process.env,STORYCHAT_PASSWORD:'synthetic-process-password',STORYCHAT_PASSWORD_FILE:'',STORYCHAT_PROVIDER:'fake',STORYCHAT_DB:db,STORYCHAT_HOST:'127.0.0.1',STORYCHAT_ORIGIN:'',PORT:'0'},stdio:['ignore','pipe','pipe']});
-  t.after(()=>child.kill('SIGKILL')); await ready(child);
-  const exited=once(child,'exit'); child.kill('SIGTERM'); const [code]=await exited; assert.equal(code,0);
-  assert.equal((await stat(db)).mode&0o077,0);
-  const lock=await acquireRuntimeLock(db+'.lock'); await lock.release();
+  const serverPath=fileURLToPath(new URL('../server.mjs',import.meta.url));
+  const wrapper=`import assert from 'node:assert/strict'; import {pathToFileURL} from 'node:url';
+    const original=console.log; console.log=(...args)=>{
+      if(String(args[0]).startsWith('Storychat:')){
+        assert.ok(process.listenerCount('SIGTERM')>0,'Readiness must follow SIGTERM handler installation.');
+        assert.ok(process.listenerCount('SIGINT')>0,'Readiness must follow SIGINT handler installation.');
+      } original(...args);
+    }; process.argv[1]=${JSON.stringify(serverPath)}; await import(pathToFileURL(process.argv[1]).href);`;
+  for(let attempt=0;attempt<3;attempt++) {
+    const child=spawn(process.execPath,['--input-type=module','-e',wrapper],{env:{...process.env,STORYCHAT_PASSWORD:'synthetic-process-password',STORYCHAT_PASSWORD_FILE:'',STORYCHAT_PROVIDER:'fake',STORYCHAT_DB:db,STORYCHAT_HOST:'127.0.0.1',STORYCHAT_ORIGIN:'',PORT:'0'},stdio:['ignore','pipe','pipe']});
+    t.after(()=>child.kill('SIGKILL')); await ready(child);
+    const exited=once(child,'exit');
+    const deadline=setTimeout(()=>child.kill('SIGKILL'),5000);
+    child.kill('SIGTERM');
+    let result; try{result=await exited;}finally{clearTimeout(deadline);}
+    const [code,signal]=result;
+    assert.equal(signal,null,`Startup ${attempt+1} must handle SIGTERM instead of terminating by signal.`);
+    assert.equal(code,0,`Startup ${attempt+1} must shut down cleanly.`);
+    assert.equal((await stat(db)).mode&0o077,0);
+    const lock=await acquireRuntimeLock(db+'.lock'); await lock.release();
+  }
 });
 
 async function pendingApplication(t,shutdownTimeoutMs) {

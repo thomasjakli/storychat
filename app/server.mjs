@@ -159,9 +159,10 @@ async function main() {
     app.server.once('error',failed);
     app.server.listen(Number(process.env.PORT || 8787),host,()=>{app.server.removeListener('error',failed);resolveListen();});
   });
-  console.log(`Storychat: ${origin || `http://${host === '::1' ? '[::1]' : host}:${app.server.address().port}`} (${provider.name}${provider.unavailable ? ', sign-in/configuration needed' : ''})`);
   let stopping=false;
   for (const event of ['SIGINT','SIGTERM']) process.once(event,()=>{if(stopping)return;stopping=true;app.close().then(async()=>{await lock.release();process.exit(0);}).catch(()=>{console.error('Shutdown deadline or cleanup failure. Stopping; unfinished turns recover as interrupted on next startup.');process.exit(1);});});
+  // Readiness is observable across processes; install cleanup before announcing it.
+  console.log(`Storychat: ${origin || `http://${host === '::1' ? '[::1]' : host}:${app.server.address().port}`} (${provider.name}${provider.unavailable ? ', sign-in/configuration needed' : ''})`);
   } catch(error) {
     if(app) await app.close(); else { await provider?.close?.(); store?.close(); }
     await lock.release(); throw error;
