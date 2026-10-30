@@ -283,6 +283,10 @@ The owner selected media incorporation as the next feature on 2026-10-30: charac
 
 Deliver in stages: **4A** private media storage, uploaded covers and backup/restore; **4B** message-linked scene images and a verified image adapter; **4C** short video and optional supported audio. Current ChatGPT plan integration does not support image generation; a subscription-authorized video route has not been established. Real automated generation requires a supported owner-approved media backend. Uploads and manual prompt/result exchange can proceed independently. No separately billed route is enabled or assumed.
 
+### Next update: character fields and private migration trial - planned
+
+Add separate Intro and Opening scene fields, a character gender selector, and a distinct introductory narrative block at the start of new stories. These accompany uploaded covers and English/German UI. Preserve original story text and snapshot semantics. Use one owner-selected character as a private trial before any wider character/story migration; do not publish reference artwork, character text or transcripts. See [character migration plan](docs/character-migration-plan.md). Existing-story migration requires a separate complete transcript/export and must not invent missing history.
+
 ### Next update: interface languages - planned
 
 Deliver English/German UI alongside character cover uploads, with English as the default and independent per-device/browser-profile persistence. Language changes preserve drafts, story text, memories and model settings. See [interface language plan](docs/interface-language-plan.md) for storage behavior, translation scope and acceptance checks.
