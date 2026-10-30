@@ -6,7 +6,7 @@ The application has no in-app payments, premium tiers, virtual currency, or paid
 
 ## Current stage
 
-Milestone 1 personal provider feasibility is complete and pushed. Milestone 2 has a working Node 24/SQLite continuity prototype, original browser interface, automated continuity checks and a bounded successful live ChatGPT scenario. Real Android acceptance remains pending. A Linux/amd64 image, Portainer-compatible Compose configuration and encrypted credential-handoff helper prepare the project for personal deployment; a finished installable Android experience remains ahead.
+Milestone 1 personal provider feasibility is complete and pushed. Milestone 2 has a working Node 24/SQLite continuity prototype, original browser interface, automated continuity checks and a bounded successful live ChatGPT scenario. Milestone 2 Android Firefox acceptance is complete based on owner-reported deployed checks. Milestone 3 adds library management, latest-turn replacement and backup/restore; its new device checks remain pending. A Linux/amd64 image, Portainer-compatible Compose configuration and encrypted credential-handoff helper prepare the project for personal deployment; a finished installable Android experience remains ahead.
 
 The app has one owner login and one protected ChatGPT connection. It persists independent stories, source-linked memories, promises, relationships and fictional thoughts. The owner can inspect, correct, pin and remove memories. Explicit fake mode supports development without model calls. No separately billed API route exists. Local command-line onboarding is verified; handoff tests use synthetic credentials. Actual-host subscription access and phone-only provider sign-in are unverified.
 
@@ -22,7 +22,7 @@ Follow the [first-deployment guide](docs/first-deployment.md) for Portainer setu
 - [Hosting assessment](docs/milestone-1-hosting.md): Android onboarding, credential ownership, Docker, and Tunnel considerations.
 - [Verification report](docs/milestone-1-verification.md): deterministic tests, findings, and gaps.
 - [Milestone status](docs/milestone-1-status.md): verified outcomes and remaining completion criteria.
-- [Continuity verification](docs/milestone-2-verification.md): independent software checks, live evidence and remaining Android acceptance.
+- [Continuity verification](docs/milestone-2-verification.md): independent software checks, live evidence and owner-reported Android acceptance.
 
 ## Deployment direction
 

@@ -1,5 +1,13 @@
 # Milestone 3 upgrade and device checks
 
+Tested image:
+
+```text
+ghcr.io/thomasjakli/storychat@sha256:b8cabe320b1dacc3047a18d53834a1e826a0cb5f3bcc7fbd36623a18e1000ef5
+```
+
+[Successful verification/publication](https://github.com/thomasjakli/storychat/actions/runs/41126200780), source commit `a96b01b0433a141bebe98157ae9b2374f60c4e76`. Use this corrected release rather than the earlier milestone 3 candidate.
+
 This release is installed manually by the owner. Agents have not accessed the running host, private stories or credentials. Keep the same Portainer stack and named volumes, and record the current image digest before changing it.
 
 ## Before upgrading an earlier image

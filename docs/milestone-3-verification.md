@@ -2,6 +2,10 @@
 
 Reviewed 2026-10-30. Ordinary checks use original synthetic fixtures and fake/scripted providers. No production database, provider credentials, host infrastructure or live inference was accessed for this work.
 
+## Published release
+
+The corrected commit `a96b01b0433a141bebe98157ae9b2374f60c4e76` passed [workflow 41126200780](https://github.com/thomasjakli/storychat/actions/runs/41126200780): 44 application tests and 62 provider/setup tests, no failures or skips. Verification job `124305490720` and publication job `124305706080` each passed actual container smoke including isolated fake backup/restore and regeneration. Publication pushed `ghcr.io/thomasjakli/storychat@sha256:b8cabe320b1dacc3047a18d53834a1e826a0cb5f3bcc7fbd36623a18e1000ef5`; anonymous manifest/config retrieval confirmed Linux/amd64 and UID/GID 1000. Desktop browser checks used an isolated fake preview and verified creation, chat, latest-message replacement with rebuilt memory and character duplication. These are not Android results.
+
 ## Independent evidence
 
 `node --test app/tests/m3-qa.test.mjs app/tests/backup.test.mjs` passes four checks on Windows Node 24. The independent replacement scenario pins and unpins a memory, begins replacement, reopens the database, verifies interruption, refuses stale completion, deletes the fact, retries replacement and checks suppression and story isolation. Backup checks restore into an isolated database, retain replacement history, regenerate safely, continue with fake inference, refuse existing destination files, reject unknown credential fields and forged context, and reject import collisions atomically.
@@ -10,7 +14,11 @@ The coordinator's HTTP checks additionally cover owner authentication, snapshot-
 
 ## Container coverage
 
-The runtime allowlist contains 22 files, including the backup and transfer modules. The actual-container smoke harness adds an isolated, network-disabled, fake-provider backup/restore scenario with no production mounts. It compares restored state, then replaces a turn and checks that superseded extracted facts disappear. The outer harness parses under Node 24. Actual execution of this new stage is pending Linux CI; syntax and local tests do not establish a container pass.
+Further independent review reproduced a corrected-fact deletion bug: regenerating a later turn restored a corrected memory from its rollback snapshot even though the owner had subsequently deleted it. Deletion suppression now takes precedence over the correction exemption. A regression establishes the corrected fact before the target turn, deletes it afterward, then verifies replacement context and completion do not resurrect it. Five focused QA/store checks pass with that fix.
+
+The runtime allowlist contains 22 files, including the backup and transfer modules. The actual-container smoke harness adds an isolated, network-disabled, fake-provider backup/restore scenario with no production mounts. It compares restored state, then replaces a turn and checks that superseded extracted facts disappear.
+
+Independent inspection of verify-job logs `124305490720` from [workflow run 41126200780](https://github.com/thomasjakli/storychat/actions/runs/41126200780), commit `a96b01b0433a141bebe98157ae9b2374f60c4e76`, confirms **44 application tests and 62 provider/setup tests pass, with no failures or skips**, on Linux Node 24. The actual container smoke passed every stage, including runtime boundaries, non-root/read-only operation, authentication, restart/replacement persistence, forced termination recovery, encrypted handoff and the new isolated logical backup/restore plus replacement scenario. These are actual Linux/container results, not inferred from local syntax checks. Publication is verified separately by the coordinator.
 
 ## Acceptance still requiring the owner
 

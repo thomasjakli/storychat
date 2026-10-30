@@ -61,7 +61,7 @@ node app/test.mjs
 node prototype/test.mjs
 ```
 
-The application suite includes 33 checks: Windows passes 31 with two Linux-only lifecycle checks skipped; GitHub Linux passes all 33. The expanded provider suite passes 58 synthetic checks on both platforms, including ten handoff and independent adversarial scenarios. Actual Linux containers also pass CLI stdin handoff and replay-after-replacement checks. See [deployment verification](deployment-verification.md). All ordinary tests use synthetic data, fake/scripted providers and temporary databases. Windows owner-only ACL tests and local HTTP tests require a runtime outside the restricted desktop sandbox; ACLs must not be weakened to run them.
+The milestone 3 application suite passes all 44 checks on Linux, with no skips. Windows skips two Linux lifecycle checks. The provider/setup suite passes 62 checks on Linux; Windows skips its Linux launcher check. Actual Linux containers also pass CLI stdin handoff and replay-after-replacement checks. See [deployment verification](deployment-verification.md). All ordinary tests use synthetic data, fake/scripted providers and temporary databases. Windows owner-only ACL tests and local HTTP tests require a runtime outside the restricted desktop sandbox; ACLs must not be weakened to run them.
 
 The optional live evaluation is **never** included in `test`. With an authorized account configured and app stopped, explicitly set `STORYCHAT_LIVE_EVAL=yes` and run `node app/evaluate-live.mjs`. It sends at most four requests, stopping on the first failed assertion, and keeps only synthetic evaluation data under ignored `data/live-evaluation/`. Seven filler turns are deterministic, so it measures live recall of persisted state without spending seven extra requests. Results are a bounded quality sample; no recurring work is scheduled.
 
@@ -85,3 +85,7 @@ ghcr.io/thomasjakli/storychat@sha256:15754aa0a2cddac92adc53a3b57e02fd6f7a7f8ceae
 ```
 
 Use this digest as `STORYCHAT_IMAGE` to pin the tested artifact. Follow the first-deployment guide with account/model initially empty, then import and activate the selected owner session. The image contains no ChatGPT credentials; host onboarding and Portainer deployment are still required.
+
+## Milestone 3 features
+
+The owner reports successful deployed milestone 2 acceptance on Android Firefox. New library management, latest-turn editing/regeneration, portable export/import and offline lossless backup/restore are described in [milestone 3 verification](milestone-3-verification.md), [recovery](backup-restore.md) and [upgrade/device checks](milestone-3-upgrade.md). Existing historical turns without a rollback baseline cannot be regenerated; new turns support safe replacement. No automatic model retry or provider change is introduced.
