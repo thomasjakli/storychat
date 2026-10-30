@@ -276,6 +276,8 @@ Prototype limits: recent context is six messages, selected memories plus state/s
 
 ### Milestone 4: Character covers and scene media — planned
 
+Current owner scope decision (2026-10-30): character title/cover uploads remain the active planned next feature. Message-based image/video generation is shelved pending a future provider discussion. Implement no generation integration or queue as part of cover uploads; provider selection does not block stage 4A. Stages 4B/4C remain deferred design only.
+
 The owner selected media incorporation as the next feature on 2026-10-30: character title/cover images and message-linked scene images or short videos, with supported video duration, quality/resolution and sound options. Detailed scope, capability/access gates, storage, source-revision integrity, recovery and acceptance criteria are in [the media plan](docs/media-plan.md). This is planning, not implemented functionality or authorization for paid services.
 
 Deliver in stages: **4A** private media storage, uploaded covers and backup/restore; **4B** message-linked scene images and a verified image adapter; **4C** short video and optional supported audio. Current ChatGPT plan integration does not support image generation; a subscription-authorized video route has not been established. Real automated generation requires a supported owner-approved media backend. Uploads and manual prompt/result exchange can proceed independently. No separately billed route is enabled or assumed.

@@ -2,11 +2,17 @@
 
 Status: planning only, 2026-10-30. No media provider, paid service, generation job or deployment change is enabled. Milestones 1–3 remain complete; deferred owner recovery testing stays non-blocking. This plan adds milestone 4 without changing those acceptance decisions.
 
+## Current priority — owner scope decision
+
+Character title/cover image uploads remain wanted. Stage 4A is the active planned scope: upload, preview/crop, replace/remove, authenticated serving, durable storage and backup/restore. It needs no image-generation provider. Stage 4A remains planning, not an implemented feature.
+
+Message-based image/video generation (stages 4B/4C) is shelved pending a future provider discussion. Do not implement generation buttons, media-provider integrations, generation queues or prompt-generation requests as part of character uploads. Message attachments/gallery, manual scene-generation workflows and video/audio controls below are retained as deferred design ideas, not requirements for 4A. No meeting or reminder has been scheduled.
+
 ## Confirmed scope
 
 - Each character can have a title/cover image shown in its library card and character details.
-- A completed story message can be illustrated as an image or short video representing its scene.
-- Video creation offers duration, quality/resolution and sound controls when the selected provider supports them.
+- Deferred: illustrate a completed story message as an image or short video representing its scene.
+- Deferred: video duration, quality/resolution and sound controls, subject to provider selection.
 - Keep the Android-first, sole-owner deployment, original interface and no in-app payments. External generation costs require separate approval.
 
 ## Provider feasibility gate
@@ -91,4 +97,4 @@ Recommended roles: Product/Architecture Planner maintains provider and scope dec
 3. Storage/job limits, preferred visual style and initial default aspect ratio; use conservative implementation proposals until selected.
 4. Sound expectations: ambient effects/music versus authored dialogue, and whether the chosen provider supports them. Do not imply real-person voice cloning.
 
-This plan authorizes no implementation or provider activity by itself. The next implementation request should start with 4A and the media-provider feasibility gate; stages 4B/4C retain their explicit live-provider acceptance gates.
+This plan authorizes no implementation or provider activity by itself. The next implementation request should cover 4A only. Provider evaluation and stages 4B/4C remain shelved until the owner reopens them; they do not block uploaded character covers.
