@@ -274,7 +274,13 @@ Prototype limits: recent context is six messages, selected memories plus state/s
 - Deploy through the selected Docker/tunnel route and verify allow/deny behavior, origin protection, streaming, session expiry, and data preservation during container replacement.
 - Document repeatable setup, migrations, backups, restore, and credential recovery.
 
-### Later enhancements
+### Milestone 4: Character covers and scene media — planned
+
+The owner selected media incorporation as the next feature on 2026-10-30: character title/cover images and message-linked scene images or short videos, with supported video duration, quality/resolution and sound options. Detailed scope, capability/access gates, storage, source-revision integrity, recovery and acceptance criteria are in [the media plan](docs/media-plan.md). This is planning, not implemented functionality or authorization for paid services.
+
+Deliver in stages: **4A** private media storage, uploaded covers and backup/restore; **4B** message-linked scene images and a verified image adapter; **4C** short video and optional supported audio. Current ChatGPT plan integration does not support image generation; a subscription-authorized video route has not been established. Real automated generation requires a supported owner-approved media backend. Uploads and manual prompt/result exchange can proceed independently. No separately billed route is enabled or assumed.
+
+### Other later enhancements
 
 Saved scene keepsakes; suggested replies; novel-style reading; multiple characters; deeper branching/rewind; generated scene media/gallery; speech/dictation/live calls; native packaging; notifications. Evaluate these individually after the core acceptance criteria pass. No enhancement introduces feature payment or progression gates.
 
@@ -300,7 +306,7 @@ The source repository is `thomasjakli/storychat`. Final application identity and
 
 - Finish owner-side export/import and actual-host backup/restore testing. Automated isolated restoration passed; the owner partially tested the manual recovery group and explicitly deferred the remainder without blocking milestone 3. The exact completed subset was not specified.
 - Choose the source license and confirm final application identity.
-- Select later enhancements only when requested; no milestone 4 is currently defined.
+- Milestone 4 media planning is defined; media backend selection/access verification remain open. Select other enhancements only when requested.
 - Interface language and additional writing-control options remain optional product preferences. Current defaults are implemented, not unresolved release blockers.
 - Deployment storage/backup destinations and external access-policy administration remain private operational choices, not public infrastructure documentation. No independent external-policy audit is claimed.
 
