@@ -8,6 +8,14 @@ Container packaging and synthetic Linux checks have passed CI. A real owner's fi
 
 Use the public [source repository](https://github.com/thomasjakli/storychat). Find a successful Container verification workflow run for a commit containing the handoff helper, and record its published immutable image digest. Set `STORYCHAT_IMAGE` to `ghcr.io/thomasjakli/storychat@sha256:<verified-digest>` or that run's full `sha-<commit>` tag. The earlier initial container release does not include handoff commands; do not assume every historical image supports this guide.
 
+The handoff release verified on 2026-10-30 is:
+
+```text
+ghcr.io/thomasjakli/storychat@sha256:fccec0160036496da7ca72d54a64b630d0a73a184faada5c55c7646a6bd0a84d
+```
+
+[Verification and publication run](https://github.com/thomasjakli/storychat/actions/runs/41107642425). It passes synthetic Linux application, provider and actual-container handoff checks; actual-owner authorization on the deployment host remains separate.
+
 Check that the host is Linux/amd64, Docker is working, Portainer manages its Docker Standalone environment, storage has space, and authenticated SSH/SCP access is available from the Windows PC. Use an existing SSH configuration/host alias and verify its host key through your usual trusted channel. Access to the Docker daemon is administrative access; do not expose its socket to this application.
 
 Keep a password manager entry for a unique owner app password of 12–256 characters. This password is distinct from OpenAI account consent. Enter it directly into Portainer's private environment settings; do not type it as a literal shell command or commit it to a repository.

@@ -30,7 +30,7 @@ STORYCHAT_TEST_IMAGE=storychat:verification node deploy/container-smoke.mjs
 | Interrupted attempt | A stopped server's synthetic database is seeded with a pending attempt; startup marks it interrupted without applying new state or issuing inference. |
 | Replacement | Remove the application container and recreate it with the same named volumes; previously corrected/pinned state and interrupted status remain. |
 | Provider-vault lifecycle | A separate synthetic encrypted vault refuses a concurrent holder, survives SIGKILL of its first holder, reacquires the same persistent lock, decrypts fake credentials, and saves a replacement fake token. Ciphertext must omit the known plaintext marker and the key must have mode 0600. This tests storage/locking, not provider acceptance. |
-| Encrypted CLI handoff | The current harness prepares a recipient request, exports one synthetic source registration, imports it through the actual CLI's bounded stdin route, inspects sanitized account status, and verifies source disconnection and destination host preservation. After a further container replacement, the consumed ledger and rotated synthetic token survive and identical-bundle replay remains a harmless no-op. This added stage requires its own Linux CI pass. |
+| Encrypted CLI handoff | The current harness prepares a recipient request, exports one synthetic source registration, imports it through the actual CLI's bounded stdin route, inspects sanitized account status, and verifies source disconnection and destination host preservation. After a further container replacement, the consumed ledger and rotated synthetic token survive and identical-bundle replay remains a harmless no-op. This stage passed both Linux CI container runs for the handoff release below. |
 
 The script creates randomly named containers/volumes bearing a per-run label. Cleanup targets only exact names created during that invocation with the matching label. Failed synthetic container logs and a sanitized result record remain in the artifact directory; cleanup is best effort if the daemon itself becomes unavailable. It does not prune unrelated resources or remove an input image.
 
@@ -77,4 +77,19 @@ Final independent review found one source-reauthorization edge: retrying an old 
 
 Code review confirms RSA-3072 OAEP/SHA-256 with AES-256-GCM and authenticated recipient/lifetime headers, bounded input, an encrypted source journal committed atomically with local token removal, and an encrypted destination replay ledger committed with credentials before private-key deletion. Request/bundle transport still requires an authenticated channel: encryption does not authenticate a substituted recipient request. Those are bounded original implementation checks, not a claim of a general cryptographic audit.
 
-The earlier Linux baseline run above does **not** verify this new handoff revision. Its Linux build/smoke/publication outcome is pending; real same-owner credential transfer, actual-host provider renewal, owner ingress, backups, and Android acceptance remain unverified.
+The earlier Linux baseline run above does **not** verify this new handoff revision. Separate Linux evidence for the handoff release follows; real same-owner credential transfer, actual-host provider renewal, owner ingress, backups, and Android acceptance remain unverified.
+
+## Current Linux CI outcome — encrypted handoff release
+
+Independent log inspection confirms [workflow run 41107642425](https://github.com/thomasjakli/storychat/actions/runs/41107642425), commit `6ac9e6ec3b4ce17afffefbeebe314fdc4c1e3bed`, passed the verification stage with Node 24.22.2: **33 application tests and 58 provider/handoff tests passed, 0 failed, 0 skipped**. Verify job `124241558124` built the Linux amd64 image and passed every container stage, including the actual CLI encrypted export/import, stdin import, sanitized status, persistent consumed ledger, and replay after replacement without overwriting a rotated synthetic token. The exact 18-file runtime boundary and non-root/read-only restrictions passed.
+
+This result followed a failed candidate run, [41107326563](https://github.com/thomasjakli/storychat/actions/runs/41107326563), whose application suite found a startup readiness race before provider tests or image publication. The server printed readiness before registering signal handlers, allowing an immediate SIGTERM to terminate by signal. The coordinator moved readiness after handler installation. Independent QA strengthened the existing Linux regression to assert both handlers are installed before readiness and perform three start/SIGTERM/lock-reacquisition cycles on the same database. The corrected Linux run passed this regression; the failure was fixed rather than retried unchanged.
+
+Publication job `124241821893` independently rebuilt and passed the complete smoke again before pushing the tested image:
+
+```text
+ghcr.io/thomasjakli/storychat:sha-6ac9e6ec3b4ce17afffefbeebe314fdc4c1e3bed
+sha256:fccec0160036496da7ca72d54a64b630d0a73a184faada5c55c7646a6bd0a84d
+```
+
+These are independently observed workflow build/test/push results. They use generated synthetic credentials and network-isolated test containers, with no live provider calls. The `STORYCHAT_KEY_DIR` public-path BuildKit heuristic warning remains visible. The actual owner deployment and Android gates listed above remain open; publishing this image does not imply that either was tested.
