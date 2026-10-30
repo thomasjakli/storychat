@@ -92,16 +92,16 @@ try {
     import {readdirSync,statSync,writeFileSync} from 'node:fs';
     import assert from 'node:assert/strict';
     assert.equal(process.getuid(),1000);
-    const forbidden=/(^|\/)(analysis|tests|data|secrets|\.git|node_modules)(\/|$)|screenshots|\.apk$|\.env|evaluate-live/i;
-    const files=[];function walk(path){for(const name of readdirSync(path)){const target=path+'/'+name;assert.ok(!forbidden.test(target), 'Excluded file in image: '+target);if(statSync(target).isDirectory())walk(target);else files.push(target.slice(5));}}
-    walk('/app');assert.deepEqual(files.sort(),['app/backup.mjs','app/transfer.mjs','app/provider.mjs','app/server.mjs','app/store.mjs','deploy/healthcheck.mjs','deploy/connect-chatgpt.sh','prototype/auth.mjs','prototype/cli.mjs','prototype/connection.mjs','prototype/errors.mjs','prototype/handoff.mjs','prototype/output.mjs','prototype/provider.mjs','prototype/runtime-lock.mjs','prototype/stream.mjs','prototype/vault.mjs','public/app.js','public/icon.svg','public/index.html','public/manifest.webmanifest','public/style.css'].sort());assert.throws(()=>writeFileSync('/app/qa-write','blocked'));
-    for(const path of ['/var/lib/storychat/stories','/var/lib/storychat/provider','/var/lib/storychat/keys']){const s=statSync(path);assert.equal(s.uid,1000);assert.equal(s.mode&0o777,0o700);}
+    const forbidden=/(^|\/)(analysis|tests|data|secrets|\.git)(\/|$)|screenshots|\.apk$|\.env|evaluate-live/i;
+    const files=[];function walk(path){for(const name of readdirSync(path)){const target=path+'/'+name;if(target==='/app/node_modules')continue;assert.ok(!forbidden.test(target), 'Excluded file in image: '+target);if(statSync(target).isDirectory())walk(target);else files.push(target.slice(5));}}
+    const sharp=(await import('sharp')).default;assert.ok(sharp.versions.vips);walk('/app');assert.deepEqual(files.sort(),['package.json','package-lock.json','app/media.mjs','app/media-transfer.mjs','public/explorer.js','public/i18n.js','app/backup.mjs','app/transfer.mjs','app/provider.mjs','app/server.mjs','app/store.mjs','deploy/healthcheck.mjs','deploy/connect-chatgpt.sh','prototype/auth.mjs','prototype/cli.mjs','prototype/connection.mjs','prototype/errors.mjs','prototype/handoff.mjs','prototype/output.mjs','prototype/provider.mjs','prototype/runtime-lock.mjs','prototype/stream.mjs','prototype/vault.mjs','public/app.js','public/icon.svg','public/index.html','public/manifest.webmanifest','public/style.css'].sort());assert.throws(()=>writeFileSync('/app/qa-write','blocked'));
+    for(const path of ['/var/lib/storychat/stories','/var/lib/storychat/provider','/var/lib/storychat/keys','/var/lib/storychat/media']){const s=statSync(path);assert.equal(s.uid,1000);assert.equal(s.mode&0o777,0o700);}
   `]);
   assert.equal(docker(['wait', inspectName]).stdout.trim(), '0');
   removeContainer(inspectName);
 
   const mounts = [];
-  for (const [suffix, destination] of [['stories', 'stories'], ['provider', 'provider'], ['keys', 'keys']]) {
+  for (const [suffix, destination] of [['stories', 'stories'], ['provider', 'provider'], ['keys', 'keys'], ['media', 'media']]) {
     const name = `${prefix}-${suffix}`; volumes.add(name);
     docker(['volume', 'create', '--label', label, name]);
     mounts.push('--mount', `type=volume,src=${name},dst=/var/lib/storychat/${destination}`);
