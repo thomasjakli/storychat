@@ -15,3 +15,12 @@ test('QA replacement interruption survives reopen without resurrecting deleted s
  store.deleteMemory(story.id,s.memories[0].id);s=store.getStory(story.id);const retry=store.beginReplacement(story.id,{requestId:'retry',generationId:replacement.generation.id,revision:s.revision});store.finishTurn(story.id,retry.generation.id,result(retry.generation.userMessageId));assert.equal(store.getStory(story.id).memories.length,0);
  const independent=store.createStory({characterId:c.id,personaId:p.id,title:'Independent'});assert.equal(store.getStory(independent.id).messages.length,0);
 });
+
+test('QA deleting a corrected fact after a later turn prevents rollback resurrection',t=>{
+ const store=new Store(':memory:');t.after(()=>store.close());const c=store.createCharacter({name:'Nera',definition:'Synthetic adult navigator.'}),p=store.createPersona({name:'Sol',definition:'Synthetic adult visitor.'});const story=store.createStory({characterId:c.id,personaId:p.id,title:'Synthetic correction'});
+ const first=store.beginTurn(story.id,{requestId:'first',text:'A silver compass.'});store.finishTurn(story.id,first.generation.id,result(first.generation.userMessageId));
+ let state=store.getStory(story.id);const memoryId=state.memories[0].id;store.editMemory(story.id,memoryId,{text:'The compass is amber.',pinned:true});
+ const later=store.beginTurn(story.id,{requestId:'later',text:'Continue the scene.'});store.finishTurn(story.id,later.generation.id,{...result(later.generation.userMessageId),memories:[]});store.deleteMemory(story.id,memoryId);state=store.getStory(story.id);
+ const replacement=store.beginReplacement(story.id,{requestId:'replace-later',generationId:later.generation.id,revision:state.revision});assert.equal(replacement.context.memories.length,0);
+ store.finishTurn(story.id,replacement.generation.id,result(replacement.generation.userMessageId));assert.equal(store.getStory(story.id).memories.length,0);
+});

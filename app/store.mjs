@@ -164,7 +164,10 @@ export class Store {
       for(const key of ['scene','memories','threads','relationship','thoughts','summary'])story[key]=base[key];
       for(const memory of ownerMemories){story.memories=story.memories.filter(m=>m.id!==memory.id && !(memory.corrected&&normalized(m.key)===normalized(memory.key)));story.memories.push(memory);}
       const suppressed=entry=>story.suppression.some(s=>normalized(entry.key)===normalized(s.key)||normalized(entry.text).includes(s.text));
-      story.memories=story.memories.filter(m=>m.corrected || !suppressed(m));
+      // Corrections may survive their old-value suppression, but explicit deletion
+      // always wins, including corrected facts restored from a pre-turn snapshot.
+      const deleted=entry=>story.suppression.some(s=>s.reason==='deletion'&&(normalized(entry.key)===normalized(s.key)||normalized(entry.text).includes(s.text)));
+      story.memories=story.memories.filter(m=>!deleted(m)&&(m.corrected || !suppressed(m)));
       for(const category of ['threads','relationship','thoughts'])story[category]=story[category].filter(entry=>!suppressed(entry));
       if(story.scene&&story.suppression.some(s=>normalized(story.scene.text+' '+story.scene.fictionalTime).includes(s.text)))story.scene=null;
       for(const message of story.messages)if(message.id===target.userMessageId||message.generationId===target.id)message.superseded=true;
