@@ -283,6 +283,10 @@ The owner selected media incorporation as the next feature on 2026-10-30: charac
 
 Deliver in stages: **4A** private media storage, uploaded covers and backup/restore; **4B** message-linked scene images and a verified image adapter; **4C** short video and optional supported audio. Current ChatGPT plan integration does not support image generation; a subscription-authorized video route has not been established. Real automated generation requires a supported owner-approved media backend. Uploads and manual prompt/result exchange can proceed independently. No separately billed route is enabled or assumed.
 
+### Next update: separate character exploration - planned
+
+The owner requests an independent character-exploration page rather than managing characters only inside the story notebook. Plan separate Characters and Stories destinations, portrait cards, search/filter/detail views and explicit start-new versus continue-existing story flows. Browse local created/imported characters; do not bundle private reference data or automatically mirror an external service. Recommended model additions include optional subtitle, intro, gender, managed cover, category/tags and private provenance, keeping owner preferences separate from versioned story content. See [character exploration/model plan](docs/character-exploration-plan.md) for gaps, proposals, migrations, API contracts and acceptance.
+
 ### Next update: character fields and private migration trial - planned
 
 Add separate Intro and Opening scene fields, a character gender selector, and a distinct introductory narrative block at the start of new stories. These accompany uploaded covers and English/German UI. Preserve original story text and snapshot semantics. Use one owner-selected character as a private trial before any wider character/story migration; do not publish reference artwork, character text or transcripts. See [character migration plan](docs/character-migration-plan.md). Existing-story migration requires a separate complete transcript/export and must not invent missing history.
