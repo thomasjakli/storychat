@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { readFile, open } from 'node:fs/promises';
+import { readFile, open, readdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.mjs';
@@ -90,6 +90,12 @@ export function createApplication({store, provider, password, origin, secureCook
           for(const k of ['offset','limit']) if(k in query) {if(!/^\d+$/.test(query[k])) throw fail('invalid','Invalid page.');query[k]=Number(query[k]);}
           if('favorites' in query) {if(!['true','false'].includes(query.favorites)) throw fail('invalid','Invalid filter.');query.favorites=query.favorites==='true';}
           return send(res,200,store.queryCharacters(query));
+        }
+        if(path==='/api/media' && req.method==='GET') {
+          if(!media)throw fail('not_found','Media unavailable.');
+          const usage=await media.usage(),refs=collectMediaReferences(exportData(store,{includeHistory:true})),unreferenced=[];
+          for(const entry of await readdir(media.directory,{withFileTypes:true}))if(entry.isDirectory() && /^[0-9a-f-]{36}$/.test(entry.name) && !refs.has(entry.name)){const meta=await media.metadata(entry.name);unreferenced.push({id:meta.id,bytes:meta.bytes});}
+          return send(res,200,{...usage,maxBytes:media.maxBytes,unreferenced});
         }
         if (path === '/api/media' && req.method==='POST') {
           if(!media) throw fail('invalid','Media storage unavailable.');

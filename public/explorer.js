@@ -39,16 +39,23 @@ $('character-draft').addEventListener('change',()=>{$('definition-text').require
 $('create-character').addEventListener('click',()=>editCharacter());
 $('nav-characters').addEventListener('click',()=>{location.hash='characters';loadCharacters().catch(e=>showNotice(e.message,true));});
 $('nav-stories').addEventListener('click',()=>{saveDraft();location.hash='stories';loadLibrary().catch(e=>showNotice(e.message,true));});
-$('nav-settings').addEventListener('click',()=>{saveDraft();stopPolling();view('settings-view');location.hash='settings';});
+$('nav-settings').addEventListener('click',()=>{saveDraft();stopPolling();view('settings-view');location.hash='settings';refreshMediaUsage().catch(error=>showNotice(error.message,true));});
 for(const id of ['manage-library','export-data','import-data','install-help'])$('settings-tools').append($(id));
 $('character-search').addEventListener('submit',e=>{e.preventDefault();loadCharacters(true).catch(e=>showNotice(e.message,true));});
 $('clear-search').addEventListener('click',()=>{$('character-search').reset();loadCharacters(true).catch(e=>showNotice(e.message,true));});
 $('characters-prev').addEventListener('click',()=>{characterOffset=Math.max(0,characterOffset-24);loadCharacters().catch(e=>showNotice(e.message,true));});
 $('characters-next').addEventListener('click',()=>{characterOffset+=24;loadCharacters().catch(e=>showNotice(e.message,true));});
 $('character-back').addEventListener('click',async()=>{location.hash='characters';await loadCharacters();window.scrollTo(0,explorerScroll);});
-function routeCurrentHash(){if(!state.session?.authenticated)return;const hash=location.hash.slice(1);if(hash.startsWith('character/'))openCharacter(decodeURIComponent(hash.slice(10))).catch(e=>showNotice(e.message,true));else if(hash==='characters')loadCharacters().catch(e=>showNotice(e.message,true));else if(hash==='settings')view('settings-view');else if(hash==='stories')loadLibrary().catch(e=>showNotice(e.message,true));}
+function routeCurrentHash(){if(!state.session?.authenticated)return;const hash=location.hash.slice(1);if(hash.startsWith('character/'))openCharacter(decodeURIComponent(hash.slice(10))).catch(e=>showNotice(e.message,true));else if(hash==='characters')loadCharacters().catch(e=>showNotice(e.message,true));else if(hash==='settings'){view('settings-view');refreshMediaUsage().catch(error=>showNotice(error.message,true));}else if(hash==='stories')loadLibrary().catch(e=>showNotice(e.message,true));}
 window.addEventListener('popstate',routeCurrentHash);
 
 document.addEventListener('uilanguagechange',()=>{for(const node of document.querySelectorAll('[data-gender]'))node.textContent=t({unspecified:'Unspecified',woman:'Woman',man:'Man',nonbinary:'Nonbinary',other:'Other'}[node.dataset.gender]||'Unspecified');for(const node of document.querySelectorAll('[data-favorite-name]'))node.setAttribute('aria-label',t('Favorite')+': '+node.dataset.favoriteName);if(state.story){renderMessages();renderState();renderGeneration();const controls=state.story.controls;$('control-summary').textContent=[controls.tone,controls.detail,controls.length].map(value=>t(value[0].toUpperCase()+value.slice(1))).join(' · ');}else if(state.view==='library-view')renderLibrary();});
 
 for(const input of document.querySelectorAll('input[maxlength]:not([type=password]),textarea[maxlength]')){const counter=el('span','hint field-counter');counter.dataset.content='';const update=()=>counter.textContent=input.value.length+' / '+input.maxLength;input.addEventListener('input',update);input.addEventListener('change',update);input.after(counter);update();}
+
+let mediaUsage=null;
+function renderMediaUsage(){if(!mediaUsage)return;const number=new Intl.NumberFormat(uiLocale,{maximumFractionDigits:1});$('media-usage').textContent=t('Storage used')+': '+number.format(mediaUsage.bytes/1048576)+' / '+number.format(mediaUsage.maxBytes/1048576)+' MiB · '+t('Images')+': '+number.format(mediaUsage.assets)+' · '+t('Unused images')+': '+number.format(mediaUsage.unreferenced.length);$('delete-unused-media').disabled=!mediaUsage.unreferenced.length;}
+async function refreshMediaUsage(){mediaUsage=await api('/api/media');renderMediaUsage();}
+$('refresh-media-usage').addEventListener('click',()=>refreshMediaUsage().catch(error=>showNotice(error.message,true)));
+$('delete-unused-media').addEventListener('click',async()=>{if(!uiConfirm('Delete all unused uploaded images? Images retained by characters or stories will be preserved.'))return;$('delete-unused-media').disabled=true;try{await refreshMediaUsage();for(const asset of mediaUsage.unreferenced)await api('/api/media/'+encodeURIComponent(asset.id),{method:'DELETE'});await refreshMediaUsage();showNotice('Unused images removed.');}catch(error){showNotice(error.message,true);await refreshMediaUsage().catch(()=>{});}});
+document.addEventListener('uilanguagechange',renderMediaUsage);
