@@ -315,3 +315,5 @@ Do not turn unanswered preferences into confirmed requirements. Implementation c
 - Provider, tunnel, access-control, and backup sources are linked beside their relevant constraints above.
 
 Maintain this file as the current product specification, not a transcript of research. Update confirmed decisions, milestone evidence, and dated provider constraints as work progresses. Keep private provenance/research records separate from public documentation. This maintenance practice does not create a scheduled monitor.
+
+SSH setup release verification: commit a47c64bbae6f40d8f91e9f003b1b1a66411421e0 passes Linux CI (35 app and 62 provider/setup checks, no skips), both actual container smoke runs, and anonymous image retrieval. The launcher is available for owner testing; actual host SSH/browser consent and Android acceptance remain pending. See docs/first-deployment.md.

@@ -99,3 +99,5 @@ sha256:fccec0160036496da7ca72d54a64b630d0a73a184faada5c55c7646a6bd0a84d
 ```
 
 These are independently observed workflow build/test/push results. They use generated synthetic credentials and network-isolated test containers, with no live provider calls. The `STORYCHAT_KEY_DIR` public-path BuildKit heuristic warning remains visible. The actual owner deployment and Android gates listed above remain open; publishing this image does not imply that either was tested.
+
+SSH release a47c64bbae6f40d8f91e9f003b1b1a66411421e0: Linux CI run 41121879152 passes 35 application and 62 provider/setup tests with no skips. Both container smoke runs passed. Published digest sha256:15754aa0a2cddac92adc53a3b57e02fd6f7a7f8ceae9e9969cf55ae3f9069440 anonymously retrieves as Linux/amd64 UID 1000. Launcher tests use mock Docker; actual owner SSH forwarding and browser consent remain unverified.

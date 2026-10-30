@@ -6,7 +6,7 @@ Container packaging and synthetic Linux checks have passed CI. A real owner's fi
 
 ## Recommended: SSH-assisted connection
 
-Use a release containing `deploy/connect-chatgpt.sh` and `connect-ssh`; the earlier handoff image shown below predates this feature. Keep `STORYCHAT_ACCOUNT_ID` and `STORYCHAT_MODEL` empty in Portainer. The app reads the model/account selection saved by this setup when both overrides are empty.
+Use a release containing `deploy/connect-chatgpt.sh` and `connect-ssh`; the verified SSH image shown below includes this feature. Keep `STORYCHAT_ACCOUNT_ID` and `STORYCHAT_MODEL` empty in Portainer. The app reads the model/account selection saved by this setup when both overrides are empty.
 
 After deploying the stack and checking its HTTPS login, run from the matching repository checkout on your Windows PC:
 
@@ -27,13 +27,13 @@ Device-code authentication is documented for Codex, but its credentials are not 
 
 Use the public [source repository](https://github.com/thomasjakli/storychat). Find a successful Container verification workflow run for a commit containing the handoff helper, and record its published immutable image digest. Set `STORYCHAT_IMAGE` to `ghcr.io/thomasjakli/storychat@sha256:<verified-digest>` or that run's full `sha-<commit>` tag. The earlier initial container release does not include handoff commands; do not assume every historical image supports this guide.
 
-The handoff release verified on 2026-10-30 is:
+The SSH-assisted release verified on 2026-10-30 is:
 
 ```text
-ghcr.io/thomasjakli/storychat@sha256:fccec0160036496da7ca72d54a64b630d0a73a184faada5c55c7646a6bd0a84d
+ghcr.io/thomasjakli/storychat@sha256:15754aa0a2cddac92adc53a3b57e02fd6f7a7f8ceae9e9969cf55ae3f9069440
 ```
 
-[Verification and publication run](https://github.com/thomasjakli/storychat/actions/runs/41107642425). It passes synthetic Linux application, provider and actual-container handoff checks; actual-owner authorization on the deployment host remains separate.
+[Verification and publication run](https://github.com/thomasjakli/storychat/actions/runs/41121879152). It passes synthetic Linux application, provider and actual-container handoff checks; actual-owner authorization on the deployment host remains separate.
 
 Check that the host is Linux/amd64, Docker is working, Portainer manages its Docker Standalone environment, storage has space, and authenticated SSH/SCP access is available from the Windows PC. Use an existing SSH configuration/host alias and verify its host key through your usual trusted channel. Access to the Docker daemon is administrative access; do not expose its socket to this application.
 

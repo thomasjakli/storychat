@@ -80,8 +80,8 @@ See [container packaging](../deploy/README.md) and the [first-deployment guide](
 The verified handoff release is publicly retrievable using either its source-commit tag or digest:
 
 ```text
-ghcr.io/thomasjakli/storychat:sha-6ac9e6ec3b4ce17afffefbeebe314fdc4c1e3bed
-ghcr.io/thomasjakli/storychat@sha256:fccec0160036496da7ca72d54a64b630d0a73a184faada5c55c7646a6bd0a84d
+ghcr.io/thomasjakli/storychat:sha-a47c64bbae6f40d8f91e9f003b1b1a66411421e0
+ghcr.io/thomasjakli/storychat@sha256:15754aa0a2cddac92adc53a3b57e02fd6f7a7f8ceae9e9969cf55ae3f9069440
 ```
 
 Use this digest as `STORYCHAT_IMAGE` to pin the tested artifact. Follow the first-deployment guide with account/model initially empty, then import and activate the selected owner session. The image contains no ChatGPT credentials; host onboarding and Portainer deployment are still required.
