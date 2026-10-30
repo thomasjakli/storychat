@@ -9,6 +9,7 @@ import { mkdtemp, rm, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { acquireRuntimeLock } from '../../prototype/runtime-lock.mjs';
 const password='synthetic-test-password';
 const blank = source => ({reply:'Synthetic reply.',memories:[{kind:'fact',key:'lantern',text:'The lantern is green.',sources:[source]}],threads:[],relationship:[],thoughts:[],scene:null});
 async function fixture(t, generate) {
@@ -68,6 +69,7 @@ test('startup port conflict releases database lock instead of stranding the runt
   let output=''; child.stdout.on('data',chunk=>{output+=chunk;}); child.stderr.on('data',chunk=>{output+=chunk;});
   const timeout=setTimeout(()=>child.kill(),10000); const [code]=await once(child,'exit'); clearTimeout(timeout);
   assert.equal(code,1); assert.match(output,/Startup failed/);
-  await assert.rejects(access(db+'.lock'),{code:'ENOENT'});
+  if (process.platform !== 'linux') await assert.rejects(access(db+'.lock'),{code:'ENOENT'});
+  const recoveredLock=await acquireRuntimeLock(db+'.lock'); await recoveredLock.release();
   const reopened=new Store(db); assert.equal(reopened.library().stories.length,0); reopened.close();
 });

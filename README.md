@@ -12,6 +12,8 @@ The app has one owner login and one protected ChatGPT connection. It persists in
 
 Use [running instructions](docs/running.md) for startup, configuration, tests and the real-device checklist. No dependency installation or frontend build is required.
 
+Docker packaging and a GitHub verification/publication workflow are also available; see the [container guide](deploy/README.md) and [deployment evidence](docs/deployment-verification.md). They do not configure an owner instance or transfer ChatGPT credentials. The current application suite adds lifecycle checks to the original continuity tests; platform-specific results are recorded in the evidence report.
+
 ## Documents
 
 - [Project specification](project.md): requirements, scope, milestones, and unresolved decisions.

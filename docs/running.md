@@ -46,7 +46,9 @@ The browser receives app session cookies, never provider credentials. Default en
 
 ## Persistence and recovery
 
-SQLite lives at ignored `data/storychat/storychat.sqlite`; `STORYCHAT_DB` may point to a dedicated app data directory. Production startup protects that directory with owner-only Windows ACLs or Unix mode 0700. Its parent must be dedicated to this app, since its ACL is changed. Provider secrets remain separate from the story database. Run one server per database: a `.sqlite.lock` file prevents accidental parallel startup. After a crash, first verify the original process is gone before removing only that stale lock file. Startup marks pending generations interrupted; it never resends a model request automatically.
+SQLite lives at ignored `data/storychat/storychat.sqlite`; `STORYCHAT_DB` may point to a dedicated app data directory. Production startup protects that directory with owner-only Windows ACLs or Unix mode 0700 and creates private files with umask 077. Its parent must be dedicated to this app, since its ACL is changed. Provider secrets remain separate from the story database. Run one server per database. On Linux, `util-linux`'s `flock` guards persistent database/provider lock files and releases ownership after a process crash; **never delete Linux lock files**. On Windows, exclusive marker files remain fail-closed: after a crash, first verify every process using that runtime is gone before removing only the stale marker. Startup marks pending generations interrupted; it never resends a model request automatically.
+
+The app also accepts `STORYCHAT_PASSWORD_FILE` for a mounted UTF-8 owner password file; do not set it together with `STORYCHAT_PASSWORD`. The file is bounded and only its terminal newline is removed. Compose's default Portainer configuration uses `STORYCHAT_PASSWORD`; keep private values outside Git and restrict deployment-manager access.
 
 Completed replies and state commit atomically. A failed turn retains its user message and a safe error; the owner can explicitly use it as a draft for another attempt. Ambiguous HTTP sends can resume with the same request ID. Restart requires app login again; stories and controls remain. Drafts are stored on the browser device and cleared on successful logout. Final narrative appears after completed structured validation; visible incremental narrative streaming is deferred.
 
@@ -59,7 +61,7 @@ node app/test.mjs
 node prototype/test.mjs
 ```
 
-Expected at this revision: 27 application checks and 48 provider-spike checks pass. All ordinary tests use synthetic data, fake/scripted providers and temporary databases. Windows owner-only ACL tests and local HTTP tests require a runtime outside the restricted desktop sandbox; ACLs must not be weakened to run them.
+The application suite now includes 33 checks: Windows passes 31 with two Linux-only lifecycle checks skipped; Linux is expected to run all 33. The provider-spike suite has 48 checks. See [deployment verification](deployment-verification.md) for actual platform/container results. All ordinary tests use synthetic data, fake/scripted providers and temporary databases. Windows owner-only ACL tests and local HTTP tests require a runtime outside the restricted desktop sandbox; ACLs must not be weakened to run them.
 
 The optional live evaluation is **never** included in `test`. With an authorized account configured and app stopped, explicitly set `STORYCHAT_LIVE_EVAL=yes` and run `node app/evaluate-live.mjs`. It sends at most four requests, stopping on the first failed assertion, and keeps only synthetic evaluation data under ignored `data/live-evaluation/`. Seven filler turns are deterministic, so it measures live recall of persisted state without spending seven extra requests. Results are a bounded quality sample; no recurring work is scheduled.
 
@@ -70,3 +72,7 @@ The current local preview URL works only on the Windows PC. A phone's loopback a
 On the actual Android device, verify owner login; creating character/persona/story; entering a fact and promise; reading the reply; opening source links; correction, pinning and removal; saving all three writing controls; closing/reopening the browser; and resuming after server restart. Record browser/device and results. Home-screen installation, virtual keyboard/background/stream recovery and actual Docker/Tunnel checks remain milestone 3. No service worker caches private data; the manifest and original SVG are groundwork, not proof of Android installability.
 
 No Docker host, tunnel, DNS, public service, paid fallback or recurring model workload is provisioned by this prototype.
+
+## Container preparation
+
+See [container packaging](../deploy/README.md) for the parameterized Compose stack, image contents, owner-only volumes, manual rollout and lifecycle checks. The public template contains no instance network topology or credentials. GitHub workflow verification and image publication are separate from deploying that image to the owner's host. Same-owner credential handoff and real Android acceptance remain separate steps.

@@ -1,8 +1,8 @@
-import { mkdir, readFile, writeFile, rename, open, unlink, chmod } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, unlink, chmod } from 'node:fs/promises';
 import { randomBytes, randomUUID, createCipheriv, createDecipheriv } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { ProviderError } from './errors.mjs';
+import { acquireRuntimeLock } from './runtime-lock.mjs';
 
 async function protect(directory) {
   await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -21,14 +21,9 @@ export class Vault {
   }
   async locked(action) {
     await protect(this.directory); await protect(this.keyDirectory);
-    let lock;
-    try { lock = await open(join(this.directory, '.lock'), 'wx', 0o600); }
-    catch (error) {
-      if (error.code === 'EEXIST') throw new ProviderError('runtime_locked', 'Runtime locked by another process. If it crashed, verify no process is running before removing data/provider-spike/.lock.');
-      throw new ProviderError('runtime_permissions', 'Protected runtime path is inaccessible. Check OS permissions or run outside the restricted sandbox.');
-    }
+    const lock = await acquireRuntimeLock(join(this.directory, '.lock'));
     try { return await action(); }
-    finally { await lock.close(); await unlink(join(this.directory, '.lock')); }
+    finally { await lock.release(); }
   }
   async key() {
     try {

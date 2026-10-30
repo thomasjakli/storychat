@@ -1,0 +1,40 @@
+# Pull an explicitly selected release; building/publishing and ingress are separate steps.
+services:
+  storychat:
+    image: ${STORYCHAT_IMAGE:?Set STORYCHAT_IMAGE to an explicit release tag or digest}
+    platform: linux/amd64
+    init: true
+    user: "1000:1000"
+    restart: unless-stopped
+    stop_grace_period: 150s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    ports:
+      - "${STORYCHAT_BIND_ADDRESS:-127.0.0.1}:${STORYCHAT_PORT:-8787}:8787"
+    environment:
+      NODE_ENV: production
+      STORYCHAT_HOST: 0.0.0.0
+      PORT: "8787"
+      STORYCHAT_ORIGIN: ${STORYCHAT_ORIGIN:?Set STORYCHAT_ORIGIN to the owner-managed HTTPS origin}
+      STORYCHAT_PASSWORD: ${STORYCHAT_PASSWORD:?Set a unique owner password of 12-256 characters}
+      STORYCHAT_PROVIDER: ${STORYCHAT_PROVIDER:-chatgpt}
+      STORYCHAT_ACCOUNT_ID: ${STORYCHAT_ACCOUNT_ID:-}
+      STORYCHAT_MODEL: ${STORYCHAT_MODEL:-}
+      STORYCHAT_DB: /var/lib/storychat/stories/storychat.sqlite
+      STORYCHAT_DATA_DIR: /var/lib/storychat/provider
+      STORYCHAT_KEY_DIR: /var/lib/storychat/keys
+    volumes:
+      - story-data:/var/lib/storychat/stories
+      - provider-data:/var/lib/storychat/provider
+      - provider-key:/var/lib/storychat/keys
+
+volumes:
+  story-data:
+  provider-data:
+  provider-key:

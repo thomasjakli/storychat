@@ -1,11 +1,12 @@
 import http from 'node:http';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { readFile, open, unlink } from 'node:fs/promises';
+import { readFile, open } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.mjs';
 import { createProvider } from './provider.mjs';
 import { protectDirectory } from '../prototype/vault.mjs';
+import { acquireRuntimeLock } from '../prototype/runtime-lock.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const fail = (code, message) => Object.assign(new Error(message), {code});
@@ -17,7 +18,8 @@ const safeProviderErrors = {
   provider_unavailable: 'ChatGPT is unavailable. Check the protected runtime and complete local sign-in if needed.',
   invalid_output: 'The response failed state validation. No model state was applied. Retry explicitly when ready.',
   context_limit: 'The story context limit was reached. Remove unneeded state before continuing.',
-  runtime_locked: 'The credential runtime is in use. Stop the other process before starting this server.',
+  runtime_locked: 'The credential runtime is locked. Stop the other process. On Windows after a crash, verify every runtime process is stopped before manually removing its lock file. Never delete Linux lock files.',
+  runtime_lock_unavailable: 'Linux runtime locking requires util-linux flock and accessible persistent volumes.',
   subscription_sharing_usage_unavailable: 'ChatGPT allowance or access is unavailable. Your story and draft are preserved.'
 };
 function publicFailure(error) {
@@ -35,15 +37,16 @@ async function body(req) {
 function send(res,status,data) { res.writeHead(status, {'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify(data)); }
 
 /** Injectable store/provider make HTTP tests deterministic without live credentials. */
-export function createApplication({store, provider, password, origin, secureCookies = false}) {
+export function createApplication({store, provider, password, origin, secureCookies = false, shutdownTimeoutMs = 130000}) {
   if (typeof password !== 'string' || password.length < 12 || password.length > 256) throw new Error('Set STORYCHAT_PASSWORD to a unique password of 12–256 characters.');
   const salt = randomBytes(32), hash = scryptSync(password,salt,32);
   const sessions = new Map(), failures = new Map(), jobs = new Set();
-  let active = false;
+  let active = false, stopping = false, closing;
   const server = http.createServer(async (req,res) => {
     res.setHeader('Cache-Control','no-store'); res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','no-referrer'); res.setHeader('X-Frame-Options','DENY');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    if (stopping) return send(res,503,{error:{code:'shutting_down',message:'The server is stopping. Your saved story is preserved.'}});
     try {
       const url = new URL(req.url,'http://localhost'), path = url.pathname;
       const expectedOrigin = origin || `http://${server.address().address === '::1' ? '[::1]' : '127.0.0.1'}:${server.address().port}`;
@@ -103,23 +106,54 @@ export function createApplication({store, provider, password, origin, secureCook
       const bytes=await readFile(resolve(root,'public',files[path])); res.writeHead(200,{'Content-Type':types[extension]}); res.end(bytes);
     } catch(error) { if (!res.headersSent) send(res,error.code === 'not_found' ? 404 : error.code === 'conflict' ? 409 : error.code === 'invalid' ? 400 : 500,{error:publicFailure(error)}); else res.end(); }
   });
-  return {server, async close() { await new Promise(resolveClose=>server.close(resolveClose)); await Promise.allSettled(jobs); await provider.close?.(); store.close(); }};
+  return {server, close() {
+    if (closing) return closing;
+    stopping = true;
+    // Stop accepting first, including keepalive clients, while existing generation
+    // jobs continue. Never release the vault/store beneath unfinished work.
+    const connectionsClosed = new Promise(resolveClose => server.close(resolveClose));
+    server.closeIdleConnections();
+    let timer;
+    const deadline = new Promise((_,reject) => { timer = setTimeout(() => { server.closeAllConnections(); reject(fail('shutdown_timeout','Shutdown deadline reached. The next startup will mark unfinished turns interrupted.')); }, shutdownTimeoutMs); });
+    const cleanup = (async () => { await connectionsClosed; await Promise.allSettled([...jobs]); await provider.close?.(); store.close(); })();
+    closing = Promise.race([cleanup,deadline]).finally(() => clearTimeout(timer));
+    return closing;
+  }};
+}
+
+export async function readOwnerPassword(environment = process.env) {
+  if (environment.STORYCHAT_PASSWORD && environment.STORYCHAT_PASSWORD_FILE) throw fail('startup_configuration','Set only STORYCHAT_PASSWORD or STORYCHAT_PASSWORD_FILE, not both.');
+  let password = environment.STORYCHAT_PASSWORD;
+  if (environment.STORYCHAT_PASSWORD_FILE) {
+    let handle;
+    try {
+      handle = await open(environment.STORYCHAT_PASSWORD_FILE, 'r');
+      if (!(await handle.stat()).isFile()) throw new Error();
+      const buffer = Buffer.alloc(1025);
+      let size=0;
+      while (size < buffer.length) { const {bytesRead}=await handle.read(buffer,size,buffer.length-size,null); if(!bytesRead)break; size+=bytesRead; }
+      if (size > 1024) throw new Error();
+      password = new TextDecoder('utf-8',{fatal:true}).decode(buffer.subarray(0,size)).replace(/\r?\n$/, '');
+    } catch { throw fail('startup_configuration','Could not read the bounded UTF-8 owner password file. Check its path, permissions and size.'); }
+    finally { await handle?.close(); }
+  }
+  if (!password || password.length < 12 || password.length > 256) throw fail('startup_configuration','Set an owner password of 12–256 characters using STORYCHAT_PASSWORD or STORYCHAT_PASSWORD_FILE.');
+  return password;
 }
 
 async function main() {
-  const password=process.env.STORYCHAT_PASSWORD;
-  if (!password || password.length < 12 || password.length > 256) throw new Error('Set STORYCHAT_PASSWORD to a unique password of 12–256 characters.');
+  process.umask(0o077);
+  const password=await readOwnerPassword();
   const host=process.env.STORYCHAT_HOST || '127.0.0.1', origin=process.env.STORYCHAT_ORIGIN;
   if (host !== '127.0.0.1' && host !== '::1' && (!origin || new URL(origin).protocol !== 'https:')) throw new Error('Remote binding requires STORYCHAT_ORIGIN with trusted HTTPS ingress.');
   const db=process.env.STORYCHAT_DB || resolve(root,'data/storychat/storychat.sqlite'); await protectDirectory(dirname(db));
-  let lock;
-  try { lock=await open(db+'.lock','wx',0o600); }
-  catch { throw new Error('Story runtime is already locked. Confirm no server is running before removing the stale database .lock file.'); }
-  let provider, app;
+  const lock=await acquireRuntimeLock(db+'.lock');
+  let provider, app, store;
   try {
   try { provider=await createProvider({}); }
   catch(error) {provider={name:'chatgpt',model:process.env.STORYCHAT_MODEL || '',unavailable:error,generate:async()=>{throw error;}}; console.error(publicFailure(error).message);}
-  app=createApplication({store:new Store(db),provider,password,origin,secureCookies:!!origin?.startsWith('https:')});
+  store = new Store(db);
+  app=createApplication({store,provider,password,origin,secureCookies:!!origin?.startsWith('https:')});
   await new Promise((resolveListen,rejectListen)=>{
     const failed=error=>rejectListen(error);
     app.server.once('error',failed);
@@ -127,7 +161,10 @@ async function main() {
   });
   console.log(`Storychat: ${origin || `http://${host === '::1' ? '[::1]' : host}:${app.server.address().port}`} (${provider.name}${provider.unavailable ? ', sign-in/configuration needed' : ''})`);
   let stopping=false;
-  for (const event of ['SIGINT','SIGTERM']) process.once(event,()=>{if(stopping)return;stopping=true;app.close().then(async()=>{await lock.close();await unlink(db+'.lock');process.exit(0);});});
-  } catch(error) { if(app) await app.close(); else await provider?.close?.(); await lock.close(); await unlink(db+'.lock'); throw error; }
+  for (const event of ['SIGINT','SIGTERM']) process.once(event,()=>{if(stopping)return;stopping=true;app.close().then(async()=>{await lock.release();process.exit(0);}).catch(()=>{console.error('Shutdown deadline or cleanup failure. Stopping; unfinished turns recover as interrupted on next startup.');process.exit(1);});});
+  } catch(error) {
+    if(app) await app.close(); else { await provider?.close?.(); store?.close(); }
+    await lock.release(); throw error;
+  }
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(()=>{console.error('Startup failed. Check Node 24, password, runtime permissions and provider configuration.'); process.exitCode=1;});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error=>{const code = error?.code; const safe = ['startup_configuration','runtime_locked','runtime_permissions','runtime_lock_unavailable'].includes(code) ? error.message : 'Check Node 24, password, runtime permissions, HTTPS origin, provider configuration and whether the port is already in use.'; console.error(`Startup failed. ${safe}`); process.exit(1);});
