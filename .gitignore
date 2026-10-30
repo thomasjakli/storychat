@@ -1,0 +1,38 @@
+# Private reference research and third-party application artifacts
+/analysis/
+/* Screenshots/
+*.apk
+*.apks
+*.xapk
+*.aab
+
+# Local credentials and configuration (publish placeholders only)
+.env
+.env.*
+!.env.example
+!.env.*.example
+/secrets/
+
+# Runtime story data, assets, exports, and backups
+/data/
+/uploads/
+/exports/
+/backups/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite*-wal
+*.sqlite*-shm
+*.log
+
+# Dependency and build caches
+node_modules/
+dist/
+build/
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+Thumbs.db
