@@ -26,3 +26,15 @@ Stop the upgraded application. Select the saved old image digest and restore the
 - Restart/recreate and confirm fields/covers persist. Export with media, restore into an isolated empty instance with fake inference and check covers/content. Do not test restore over production data.
 
 Remaining limitation: cover framing is non-destructive focal-point selection, not a freeform image editor. JPEG/PNG/WebP only, 8 MiB upload limit, default 256 MiB media capacity (`STORYCHAT_MEDIA_MAX_BYTES` can override). Unreferenced uploads count toward capacity until explicitly removed through authenticated media deletion. No external generation or migration was enabled.
+
+## Published tested image
+
+Workflow: https://github.com/thomasjakli/storychat/actions/runs/41146920415 — success, 2026-10-31 local date. Linux application 62/62 and adapter 62/62 checks passed, plus verify and publish-candidate container smoke checks. No real inference or production deployment.
+
+```text
+ghcr.io/thomasjakli/storychat:latest
+ghcr.io/thomasjakli/storychat:sha-8f050a51bb6004e56232399d32a6df3c67983155
+ghcr.io/thomasjakli/storychat@sha256:258fe0ce2aaffd92adb5fbca4e758f7043ca631329ba047f85b0c0c09d32ac0c
+```
+
+Prefer the digest for a reproducible rollout; latest is available for explicit pull/recreate. Device-dependent acceptance remains pending.
