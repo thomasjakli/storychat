@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { Vault } from '../prototype/vault.mjs';
 import { ChatGPTProvider } from '../prototype/provider.mjs';
 import { ProviderError } from '../prototype/errors.mjs';
+import { loadConnection } from '../prototype/connection.mjs';
 import { outputSchema, validateOutput } from './store.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
@@ -59,10 +60,18 @@ export async function createProvider(options = {}) {
     const result = fakeTurn(context); onDelta?.(result.reply); return result;
   }, async close() {} };
   if (mode !== 'chatgpt') throw new ProviderError('invalid_provider', 'Select chatgpt or explicitly select fake demonstration mode.');
-  const accountId = options.accountId ?? process.env.STORYCHAT_ACCOUNT_ID;
-  const model = options.model ?? process.env.STORYCHAT_MODEL;
-  if (!accountId || !model) throw new ProviderError('provider_configuration', 'Configure STORYCHAT_ACCOUNT_ID and STORYCHAT_MODEL after local CLI sign-in and model discovery.');
-  const vault = options.vault ?? new Vault(options.dataDirectory ?? process.env.STORYCHAT_DATA_DIR ?? resolve(repository, 'data/provider-spike'), options.keyDirectory ?? process.env.STORYCHAT_KEY_DIR ?? resolve(repository, 'secrets/provider-spike'));
+  const dataDirectory = options.dataDirectory ?? process.env.STORYCHAT_DATA_DIR ?? resolve(repository, 'data/provider-spike');
+  let accountId = options.accountId ?? process.env.STORYCHAT_ACCOUNT_ID;
+  let model = options.model ?? process.env.STORYCHAT_MODEL;
+  // Explicit environment pairs override saved setup; never combine a partial pair.
+  if (!accountId && !model) {
+    let saved;
+    try { saved = await loadConnection(dataDirectory); }
+    catch { throw new ProviderError('provider_configuration', 'Saved ChatGPT connection is invalid or unreadable. Run the connection setup again; no fallback was used.'); }
+    if (saved) { accountId = saved.accountId; model = saved.model; }
+  }
+  if (!accountId || !model) throw new ProviderError('provider_configuration', 'Connect ChatGPT using the SSH setup helper, or configure both STORYCHAT_ACCOUNT_ID and STORYCHAT_MODEL.');
+  const vault = options.vault ?? new Vault(dataDirectory, options.keyDirectory ?? process.env.STORYCHAT_KEY_DIR ?? resolve(repository, 'secrets/provider-spike'));
   let readyResolve, readyReject, release;
   const ready = new Promise((resolveReady, rejectReady) => { readyResolve = resolveReady; readyReject = rejectReady; });
   const closing = new Promise(resolveClose => { release = resolveClose; });

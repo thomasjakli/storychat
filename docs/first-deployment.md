@@ -4,6 +4,25 @@ This guide prepares one owner-only Linux/amd64 Docker instance managed by Portai
 
 Container packaging and synthetic Linux checks have passed CI. A real owner's first-host transfer, HTTPS route, owner-only edge policy and Android acceptance still need verification on the intended installation. An encrypted handoff test is evidence for the mechanism, not proof of a live subscription session on your host.
 
+## Recommended: SSH-assisted connection
+
+Use a release containing `deploy/connect-chatgpt.sh` and `connect-ssh`; the earlier handoff image shown below predates this feature. Keep `STORYCHAT_ACCOUNT_ID` and `STORYCHAT_MODEL` empty in Portainer. The app reads the model/account selection saved by this setup when both overrides are empty.
+
+After deploying the stack and checking its HTTPS login, run from the matching repository checkout on your Windows PC:
+
+```powershell
+.\deploy\connect-chatgpt.ps1 -HostAlias storychat-host -Container storychat
+```
+
+Replace the SSH alias and container name with your private values. Existing authenticated SSH access and Docker administration permission are required. Verify the SSH host key; do not bypass its checks. No local Node installation is required for this route.
+
+Keep the terminal open, open the printed OpenAI link in a browser on that PC, complete consent, then choose a model from the authorized catalog in the terminal. The script temporarily stops the application, authorizes in a same-image non-root helper, saves the selection in its existing provider volume and restarts the application. It makes no inference request. Reopen the app afterward and perform one short explicit live test if desired.
+
+The temporary SSH forward binds only PC loopback. The helper uses Linux host networking so its callback can bind host loopback; no callback port is published through ingress. Only provider/key volumes are mounted in that helper. Credentials originate and remain on the server. The launcher does not change Portainer settings, DNS, proxy routes or the tunnel. Storychat is unavailable during authorization; normal exits, cancellation and helper failures attempt to restart the original container. After a lost connection or host failure, check container status in Portainer and start it if needed.
+
+If port 1455 is occupied, add `-Port 1456` (or another free port). To explicitly reuse a registration, add `-Account <saved-account-id>`; `-Account new` requests a new registration. Never paste tokens or callback URLs into support chats. The provider's exact loopback callback and validation remain unchanged. SSH forwarding is documented for remote Codex authentication; applying that transport to this app is separately tested, without reusing Codex credentials. [Loopback authorization](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [SSH forwarding](https://learn.chatgpt.com/docs/auth#fallback-forward-the-localhost-callback-over-ssh).
+
+Device-code authentication is documented for Codex, but its credentials are not documented as interchangeable with this app's SIWC connection. The application retains its direct supported adapter. The manual encrypted-transfer procedure below remains an alternative recovery/onboarding route; it is not needed for SSH-assisted setup.
 ## 1. Choose a verified release
 
 Use the public [source repository](https://github.com/thomasjakli/storychat). Find a successful Container verification workflow run for a commit containing the handoff helper, and record its published immutable image digest. Set `STORYCHAT_IMAGE` to `ghcr.io/thomasjakli/storychat@sha256:<verified-digest>` or that run's full `sha-<commit>` tag. The earlier initial container release does not include handoff commands; do not assume every historical image supports this guide.

@@ -94,7 +94,7 @@ try {
     assert.equal(process.getuid(),1000);
     const forbidden=/(^|\/)(analysis|tests|data|secrets|\.git|node_modules)(\/|$)|screenshots|\.apk$|\.env|evaluate-live/i;
     const files=[];function walk(path){for(const name of readdirSync(path)){const target=path+'/'+name;assert.ok(!forbidden.test(target), 'Excluded file in image: '+target);if(statSync(target).isDirectory())walk(target);else files.push(target.slice(5));}}
-    walk('/app');assert.deepEqual(files.sort(),['app/provider.mjs','app/server.mjs','app/store.mjs','deploy/healthcheck.mjs','prototype/auth.mjs','prototype/cli.mjs','prototype/errors.mjs','prototype/handoff.mjs','prototype/output.mjs','prototype/provider.mjs','prototype/runtime-lock.mjs','prototype/stream.mjs','prototype/vault.mjs','public/app.js','public/icon.svg','public/index.html','public/manifest.webmanifest','public/style.css'].sort());assert.throws(()=>writeFileSync('/app/qa-write','blocked'));
+    walk('/app');assert.deepEqual(files.sort(),['app/provider.mjs','app/server.mjs','app/store.mjs','deploy/healthcheck.mjs','deploy/connect-chatgpt.sh','prototype/auth.mjs','prototype/cli.mjs','prototype/connection.mjs','prototype/errors.mjs','prototype/handoff.mjs','prototype/output.mjs','prototype/provider.mjs','prototype/runtime-lock.mjs','prototype/stream.mjs','prototype/vault.mjs','public/app.js','public/icon.svg','public/index.html','public/manifest.webmanifest','public/style.css'].sort());assert.throws(()=>writeFileSync('/app/qa-write','blocked'));
     for(const path of ['/var/lib/storychat/stories','/var/lib/storychat/provider','/var/lib/storychat/keys']){const s=statSync(path);assert.equal(s.uid,1000);assert.equal(s.mode&0o777,0o700);}
   `]);
   assert.equal(docker(['wait', inspectName]).stdout.trim(), '0');

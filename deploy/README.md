@@ -6,6 +6,10 @@ For the complete Portainer, local sign-in, encrypted same-owner session handoff 
 
 The exact base is `node:24.22.2-bookworm-slim`, present for amd64 in the [Docker Official Images manifest](https://github.com/docker-library/official-images/blob/master/library/node) when checked on 2026-10-30. This is a maintained patch update from the local Node 24.22.1 test runtime. `util-linux` is installed explicitly for `flock`; its availability is asserted during build. Container execution and patch compatibility must pass the release checks before publishing an image.
 
+## Simpler owner connection
+
+The recommended SSH-assisted setup is `deploy/connect-chatgpt.ps1 -HostAlias storychat-host -Container storychat` from a Windows checkout. It forwards only the loopback callback, temporarily stops the app, runs a non-root same-image authorization helper and restarts the app. Keep both account/model environment overrides empty so the saved connection is selected. Follow the first-deployment guide; older images without the launcher cannot run it. Synthetic checks do not prove live host authorization.
+
 ## Image contents and build
 
 The deny-by-default `.dockerignore` and explicit `COPY` instructions include only the application, provider transport/onboarding modules, static interface and health script. Research, screenshots, APKs, tests, live evaluations, environment files, Git history, databases, credentials and backups are excluded. Do not replace these rules with `COPY . .` or pass secrets as build arguments. Docker filters the build context before sending it to the builder. [Build context documentation](https://docs.docker.com/build/concepts/context/)

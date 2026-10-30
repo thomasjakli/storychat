@@ -63,7 +63,8 @@ export async function exchangeCode(tx, url, fetcher = fetch) {
   const claims = await verifyIdToken(tokens.id_token, { clientId, nonce: tx.nonce, subject: tx.account?.subject, fetcher });
   return tokenRecord(tokens, {}, claims, clientId);
 }
-export async function signIn(hostId, account, showUrl, fetcher = fetch) {
+export async function signIn(hostId, account, showUrl, fetcher = fetch, { port = 0 } = {}) {
+  if (!Number.isInteger(port) || (port !== 0 && (port < 1024 || port > 65535))) throw new ProviderError('invalid_callback_port', 'Callback port must be zero or an integer from 1024 to 65535.');
   let tx, server, timer;
   const result = new Promise((resolve, reject) => {
     server = createServer(async (request, response) => {
@@ -73,11 +74,11 @@ export async function signIn(hostId, account, showUrl, fetcher = fetch) {
       try { const record = await exchangeCode(tx, url, fetcher); response.end('Storychat connected. You can close this window.'); resolve(record); }
       catch (error) { response.writeHead(400).end('Sign-in failed. Return to the terminal for a safe error description.'); reject(error); }
     });
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
+    server.on('error', () => reject(new ProviderError('sign_in_listener', 'Cannot bind the requested loopback callback port. Check port availability and SSH forwarding; no different port was selected.')));
+    server.listen(port, '127.0.0.1', () => {
       tx = transaction(hostId, `http://127.0.0.1:${server.address().port}/auth/callback`, account);
       timer = setTimeout(() => reject(new ProviderError('sign_in_timeout', 'Sign-in expired. Start a fresh attempt.')), 10 * 60 * 1000);
-      showUrl(authorizationUrl(tx));
+      try { showUrl(authorizationUrl(tx)); } catch { reject(new ProviderError('sign_in_display', 'Cannot display the authorization link. Start sign-in again.')); }
     });
   });
   try { return await result; } finally { clearTimeout(timer); server.closeAllConnections(); server.close(); }

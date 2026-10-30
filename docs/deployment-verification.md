@@ -1,5 +1,11 @@
 # Container deployment verification
 
+## SSH setup revision — pending Linux execution
+
+The SSH setup revision adds a non-secret saved connection selection and a host-side authorization launcher. Independent application checks pass two scenarios: saved selection loads only when both environment fields are empty, startup performs catalog discovery without inference, partial explicit configuration cannot mix with saved values, and malformed settings fail before vault/network access. The runtime image allowlist now includes `prototype/connection.mjs` and `deploy/connect-chatgpt.sh` (20 files).
+
+These local synthetic checks do not verify a real SSH connection, browser consent, owner-host authorization, or the new image in Linux Docker. Prior release results below remain historical evidence until this revision passes CI.
+
 Reviewed 2026-10-30 by the independent Quality and Continuity Tester role.
 
 ## Current evidence

@@ -11,6 +11,7 @@ app/**
 prototype/**
 !prototype/auth.mjs
 !prototype/cli.mjs
+!prototype/connection.mjs
 !prototype/errors.mjs
 !prototype/handoff.mjs
 !prototype/output.mjs
@@ -28,3 +29,4 @@ public/**
 !deploy/
 deploy/**
 !deploy/healthcheck.mjs
+!deploy/connect-chatgpt.sh
