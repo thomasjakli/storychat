@@ -59,3 +59,7 @@ Actual Android acceptance remains pending a reachable owner-approved route. Desk
 The owner explicitly deferred the device check on 2026-10-30 and requested milestone 2 remain pending. After the usage-limit interruption, the coordinator reran both suites: application 27/27 and provider spike 48/48, no failures or skipped checks. No additional live inference was needed.
 
 A final real server startup with the fake provider passed health, owner login/logout and static-asset checks. The existing synthetic story restored its corrected pinned memory and saved writing controls after restart. This smoke check made no model requests and does not replace the pending Android check.
+
+## Owner-reported acceptance — 2026-10-30
+
+The owner reports the deployed app working on PC and Android Firefox, connected ChatGPT replies and successful completion of the requested continuity, memory editing, writing controls, reopen/restart persistence, story isolation, phone usability and logout checks. Milestone 2 is complete on that basis. These checks were reported by the owner; agents did not observe the device. New milestone 3 device/installation checks remain pending.

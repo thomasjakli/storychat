@@ -7,6 +7,8 @@ app/**
 !app/server.mjs
 !app/store.mjs
 !app/provider.mjs
+!app/transfer.mjs
+!app/backup.mjs
 !prototype/
 prototype/**
 !prototype/auth.mjs

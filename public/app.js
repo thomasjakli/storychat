@@ -1,7 +1,7 @@
 'use strict';
 
 const $ = id => document.getElementById(id);
-const state = { session: null, sessionEpoch: 0, library: null, story: null, view: 'loading', poll: null, busy: false, editingMemory: null, lastSignature: '', sendRequest: null };
+const state = { session: null, sessionEpoch: 0, library: null, story: null, view: 'loading', poll: null, busy: false, editingMemory: null, editingDefinition: null, replacing: null, lastSignature: '', sendRequest: null };
 const activeStatuses = new Set(['pending', 'running', 'streaming']);
 const draftPrefix = 'storychat:draft:';
 
@@ -47,7 +47,7 @@ function lockView() {
   $('messages').replaceChildren(); $('state-content').replaceChildren(); $('story-list').replaceChildren();
   $('message').value = ''; $('password').value = ''; $('logout').hidden = true; $('provider-badge').hidden = true;
   closeInspector();
-  for (const id of ['create-dialog', 'memory-dialog']) if ($(id).open) $(id).close();
+  for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   view('login-view');
 }
 function clearDrafts() {
@@ -106,7 +106,7 @@ async function openStory(id) {
   setTimeout(() => $('composer').scrollIntoView({ block: 'end' }), 0);
   schedulePoll();
 }
-function lastGeneration() { return state.story?.generations?.at(-1); }
+function lastGeneration() { return state.story?.generations?.filter(g => g.status !== 'superseded').at(-1); }
 function isGenerating() { return state.story?.generations?.some(g => activeStatuses.has(g.status)); }
 function schedulePoll(delay = 1500) {
   stopPolling();
@@ -153,7 +153,7 @@ function renderStory(force = false) {
 }
 function renderMessages() {
   $('messages').replaceChildren();
-  for (const message of state.story.messages || []) {
+  for (const message of (state.story.messages || []).filter(item => !item.superseded)) {
     const article = el('article', 'message' + (message.role === 'user' ? ' user' : ''));
     article.id = 'message-' + message.id;
     article.append(el('p', 'message-label', message.role === 'user' ? (state.story.persona?.name || 'You') : state.story.character?.name || 'Character'), el('div', 'message-text', message.text));
@@ -191,13 +191,24 @@ function renderGeneration() {
     status.append(el('span', '', 'Your last send could not be confirmed. Your draft is preserved.'));
     status.append(button('Resume the same send', 'quiet', () => submitTurn(state.sendRequest)));
   }
+  if (!pending && !state.busy && !state.sendRequest && generation && generation.status !== 'superseded') {
+    status.append(button('Edit latest message', 'quiet', () => openReplacement(generation)), button('Regenerate reply', 'quiet', () => regenerate(generation)));
+  }
 }
 function sourceButtons(parent, sources) {
   for (const source of sources || []) {
     parent.append(button('↗ Source', 'source-link', () => {
       closeInspector();
       const message = $('message-' + source);
-      if (!message) { showNotice('This source message is not available in the displayed transcript.', true); return; }
+      if (!message) {
+        const audit = state.story.messages?.find(item => item.id === source && item.superseded);
+        if (audit) {
+          const dialog = document.createElement('dialog'), content = el('section','create-form');
+          content.append(el('h2','','Earlier source'),el('p','hint','This message belongs to a replaced turn. It is retained as source evidence, not current story context.'),el('p','message-text',audit.text),button('Close','quiet',()=>dialog.close()));
+          dialog.append(content);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+        } else showNotice('This source message is not available in the displayed transcript.', true);
+        return;
+      }
       message.scrollIntoView({ behavior: 'smooth', block: 'center' }); message.classList.add('flash');
       setTimeout(() => message.classList.remove('flash'), 2500);
     }));
@@ -254,7 +265,7 @@ function closeInspector() {
 }
 function selectOptions(select, values) {
   select.replaceChildren(); const fresh = el('option', '', '+ Create new'); fresh.value = ''; select.append(fresh);
-  for (const item of values || []) { const option = el('option', '', item.name); option.value = item.id; select.append(option); }
+  for (const item of (values || []).filter(value => !value.archived)) { const option = el('option', '', item.name); option.value = item.id; select.append(option); }
 }
 function updateNewFields() {
   for (const kind of ['character', 'persona']) {
@@ -367,7 +378,86 @@ document.addEventListener('keydown', event => {
   }
 });
 window.matchMedia('(min-width: 900px)').addEventListener('change', closeInspector);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && state.story) refreshStory(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { saveDraft(); stopPolling(); } else if (state.story) refreshStory(); });
+window.addEventListener('pagehide', saveDraft);
 window.addEventListener('online', () => { showNotice('Connection restored. Checking saved story status…'); if (state.story) refreshStory(); });
 window.addEventListener('offline', () => showNotice('You are offline. Your draft is kept; reconnect to continue the story.', true));
 initialize();
+
+// Library controls use textContent throughout: imported definitions are untrusted text.
+async function libraryAction(kind, record, action) {
+  if (action === 'delete' && !confirm('Delete this library definition? Existing story snapshots remain unchanged.')) return;
+  try {
+    const path = `/api/${kind}/${encodeURIComponent(record.id)}`;
+    if (action === 'duplicate') await api(path + '/duplicate', {method:'POST',body:'{}'});
+    else if (action === 'delete') await api(path, {method:'DELETE'});
+    else await api(path, {method:'PATCH',body:JSON.stringify({archived:!record.archived})});
+    state.library = await api('/api/library'); renderDefinitions(); renderLibrary(); showNotice('Library updated.');
+  } catch(error) { showNotice(error.message,true); }
+}
+function renderDefinitions() {
+  const list=$('definition-list'); list.replaceChildren();
+  for (const [kind,title] of [['characters','Characters'],['personas','Personas']]) {
+    const section=el('section','definition-section'); section.append(el('h3','',title));
+    for(const record of state.library[kind] || []) {
+      const row=el('article','definition-row'); row.append(el('h3','',record.name + (record.archived?' · Archived':'')),el('p','hint',`Version ${record.version || 1}`));
+      const actions=el('div','entry-actions');
+      actions.append(button('Edit','quiet',()=>{
+        state.editingDefinition={kind,id:record.id}; $('definition-name').value=record.name; $('definition-text').value=record.definition;
+        $('definition-opening').value=record.opening||''; $('definition-opening-label').hidden=kind!=='characters'; $('definition-error').hidden=true; $('definition-dialog').showModal();
+      }),button('Duplicate','quiet',()=>libraryAction(kind,record,'duplicate')),button(record.archived?'Unarchive':'Archive','quiet',()=>libraryAction(kind,record,'archive')),button('Delete','danger',()=>libraryAction(kind,record,'delete')));
+      row.append(actions);section.append(row);
+    }
+    if(!(state.library[kind]||[]).length)section.append(el('p','hint','Create one when beginning a story.'));
+    list.append(section);
+  }
+}
+$('manage-library').addEventListener('click',()=>{renderDefinitions();$('library-dialog').showModal();});
+$('close-library').addEventListener('click',()=>$('library-dialog').close());
+$('close-definition').addEventListener('click',()=>$('definition-dialog').close());
+$('definition-form').addEventListener('submit',async event=>{
+  event.preventDefault();event.submitter.disabled=true;
+  try {
+    const {kind,id}=state.editingDefinition, changes={name:$('definition-name').value.trim(),definition:$('definition-text').value.trim()};
+    if(kind==='characters')changes.opening=$('definition-opening').value.trim();
+    await api(`/api/${kind}/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(changes)});
+    state.library=await api('/api/library');renderDefinitions();$('definition-dialog').close();showNotice('Definition saved. Existing stories retain their snapshots.');
+  }catch(error){$('definition-error').textContent=error.message;$('definition-error').hidden=false;}finally{event.submitter.disabled=false;}
+});
+function openReplacement(generation) {
+  const message=state.story.messages.find(item=>item.id===generation.userMessageId);if(!message)return;
+  state.replacing={generationId:generation.id,revision:state.story.revision};$('replace-text').value=message.text;$('replace-error').hidden=true;$('replace-dialog').showModal();
+}
+async function replaceTurn(attempt) {
+  if(state.busy || isGenerating())return;
+  state.busy=true; renderGeneration();
+  try {await api(`/api/stories/${state.story.id}/turns/replace`,{method:'POST',body:JSON.stringify(attempt)});await refreshStory();showNotice('Replacement started. Check the saved status before requesting another reply.');}
+  catch(error){showNotice(error.message+' Check the saved transcript before requesting another replacement.',true);schedulePoll(1000);throw error;}
+  finally{state.busy=false;renderGeneration();}
+}
+async function regenerate(generation) {
+  if(!confirm('Replace the latest reply and its derived state? This sends one new request using your ChatGPT allowance.'))return;
+  try{await replaceTurn({requestId:crypto.randomUUID(),generationId:generation.id,revision:state.story.revision});}catch{}
+}
+$('close-replace').addEventListener('click',()=>$('replace-dialog').close());
+$('replace-form').addEventListener('submit',async event=>{
+  event.preventDefault();event.submitter.disabled=true;
+  try{await replaceTurn({...state.replacing,requestId:crypto.randomUUID(),text:$('replace-text').value.trim()});$('replace-dialog').close();}
+  catch(error){$('replace-error').textContent=error.message;$('replace-error').hidden=false;}finally{event.submitter.disabled=false;}
+});
+$('export-data').addEventListener('click',async()=>{
+  try{const archive=await api('/api/export');const url=URL.createObjectURL(new Blob([JSON.stringify(archive,null,2)],{type:'application/json'}));const link=el('a');link.href=url;link.download='storychat-notebook-'+new Date().toISOString().slice(0,10)+'.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);showNotice('Portable export downloaded. It contains private story text but excludes replacement history and provider credentials. Use a database backup for full recovery.');}catch(error){showNotice(error.message,true);}
+});
+$('import-data').addEventListener('click',()=>$('import-file').click());
+$('import-file').addEventListener('change',async event=>{
+  const file=event.target.files[0];event.target.value='';if(!file)return;
+  if(file.size>8*1024*1024){showNotice('Import is too large (maximum 8 MiB).',true);return;}
+  if(!confirm('Import this notebook as additional records? The file may contain private story text. Existing records will remain.'))return;
+  try{const archive=JSON.parse(await file.text());await api('/api/import',{method:'POST',body:JSON.stringify(archive)});await loadLibrary();showNotice('Notebook imported. No model requests were sent.');}catch(error){showNotice(error.message,true);}
+});
+let installPrompt=null;
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('install-now').hidden=false;});
+$('install-help').addEventListener('click',()=>$('install-dialog').showModal());
+$('close-install').addEventListener('click',()=>$('install-dialog').close());
+$('install-now').addEventListener('click',async()=>{if(!installPrompt)return;await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('install-now').hidden=true;});
+window.visualViewport?.addEventListener('resize',()=>{document.documentElement.style.setProperty('--visible-height',window.visualViewport.height+'px');});

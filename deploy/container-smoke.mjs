@@ -94,7 +94,7 @@ try {
     assert.equal(process.getuid(),1000);
     const forbidden=/(^|\/)(analysis|tests|data|secrets|\.git|node_modules)(\/|$)|screenshots|\.apk$|\.env|evaluate-live/i;
     const files=[];function walk(path){for(const name of readdirSync(path)){const target=path+'/'+name;assert.ok(!forbidden.test(target), 'Excluded file in image: '+target);if(statSync(target).isDirectory())walk(target);else files.push(target.slice(5));}}
-    walk('/app');assert.deepEqual(files.sort(),['app/provider.mjs','app/server.mjs','app/store.mjs','deploy/healthcheck.mjs','deploy/connect-chatgpt.sh','prototype/auth.mjs','prototype/cli.mjs','prototype/connection.mjs','prototype/errors.mjs','prototype/handoff.mjs','prototype/output.mjs','prototype/provider.mjs','prototype/runtime-lock.mjs','prototype/stream.mjs','prototype/vault.mjs','public/app.js','public/icon.svg','public/index.html','public/manifest.webmanifest','public/style.css'].sort());assert.throws(()=>writeFileSync('/app/qa-write','blocked'));
+    walk('/app');assert.deepEqual(files.sort(),['app/backup.mjs','app/transfer.mjs','app/provider.mjs','app/server.mjs','app/store.mjs','deploy/healthcheck.mjs','deploy/connect-chatgpt.sh','prototype/auth.mjs','prototype/cli.mjs','prototype/connection.mjs','prototype/errors.mjs','prototype/handoff.mjs','prototype/output.mjs','prototype/provider.mjs','prototype/runtime-lock.mjs','prototype/stream.mjs','prototype/vault.mjs','public/app.js','public/icon.svg','public/index.html','public/manifest.webmanifest','public/style.css'].sort());assert.throws(()=>writeFileSync('/app/qa-write','blocked'));
     for(const path of ['/var/lib/storychat/stories','/var/lib/storychat/provider','/var/lib/storychat/keys']){const s=statSync(path);assert.equal(s.uid,1000);assert.equal(s.mode&0o777,0o700);}
   `]);
   assert.equal(docker(['wait', inspectName]).stdout.trim(), '0');
@@ -232,7 +232,19 @@ try {
     await vault.locked(async()=>{assert.equal((await vault.load()).accounts[expected.accountId].refresh_token,'SYNTHETIC_HANDOFF_TOKEN_ONLY_ROTATED');});
   `]);
   assert.equal(docker(['wait', persistedHandoff], { timeout: 60000 }).stdout.trim(), '0'); removeContainer(persistedHandoff);
-  console.log('Container QA passed: Linux amd64, non-root/read-only image, password file, auth, durable state, restart, SIGKILL, interruption, replacement, synthetic vault and encrypted CLI handoff. No live inference.');
+  step('isolated logical backup restore and replacement with fake inference');
+  const restored = runContainer(`${prefix}-restore`, [], ['node','--input-type=module','-e',String.raw`
+    import assert from 'node:assert/strict';import {Store} from './app/store.mjs';import {backupDatabase,restoreDatabase} from './app/backup.mjs';import {createProvider} from './app/provider.mjs';
+    const source='/tmp/source/story.sqlite',destination='/tmp/restored/story.sqlite',file='/tmp/story-backup.json';
+    let store=new Store(source);const c=store.createCharacter({name:'Synthetic adult keeper',definition:'Original synthetic fixture.'}),p=store.createPersona({name:'Synthetic adult visitor',definition:'Original synthetic fixture.'});
+    const story=store.createStory({characterId:c.id,personaId:p.id,title:'Synthetic recovery'}),provider=await createProvider({mode:'fake'});
+    const turn=store.beginTurn(story.id,{requestId:'first',text:'My favorite color is green.'});store.finishTurn(story.id,turn.generation.id,await provider.generate(turn.context));const before=store.getStory(story.id);store.close();
+    await backupDatabase(source,file);await restoreDatabase(file,destination);store=new Store(destination);assert.deepEqual(store.getStory(story.id),before);
+    const replacement=store.beginReplacement(story.id,{requestId:'replace',generationId:turn.generation.id,revision:before.revision,text:'My favorite color is amber.'});store.finishTurn(story.id,replacement.generation.id,await provider.generate(replacement.context));assert.equal(store.getStory(story.id).generations.at(-1).status,'completed');
+    assert.ok(store.getStory(story.id).memories.every(m=>!m.text.includes('green')));store.close();await provider.close();
+  `]);
+  assert.equal(docker(['wait',restored],{timeout:60000}).stdout.trim(),'0');removeContainer(restored);
+  console.log('Container QA passed: Linux amd64, non-root/read-only image, password file, auth, durable state, restart, SIGKILL, interruption, replacement, synthetic vault, encrypted CLI handoff and isolated backup restore. No live inference.');
   writeFileSync(join(artifacts, 'result.json'), JSON.stringify({ passed: true, image, platform: 'linux/amd64', liveInference: false, checks: ['image-boundaries', 'non-root', 'read-only', 'password-file', 'owner-auth', 'fake-state', 'correction-pin-controls', 'restart', 'parallel-refusal', 'SIGKILL', 'interrupted-recovery', 'replacement', 'synthetic-vault-exclusivity-and-recovery', 'encrypted-cli-handoff', 'handoff-replay-after-replacement'] }, null, 2));
 } catch (error) {
   console.error(`Container QA failed during ${stage}: ${String(error.message).replaceAll(password, '[synthetic password]')}`);

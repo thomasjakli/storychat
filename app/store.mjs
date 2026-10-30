@@ -66,7 +66,7 @@ export class Store {
   transaction(fn) { this.db.exec('BEGIN IMMEDIATE'); try { const result = fn(); this.db.exec('COMMIT'); return result; } catch (failure) { this.db.exec('ROLLBACK'); throw failure; } }
   save(story) { this.db.prepare('INSERT OR REPLACE INTO stories(id,data) VALUES(?,?)').run(story.id, JSON.stringify(story)); }
   load(storyId) { const row = this.db.prepare('SELECT data FROM stories WHERE id=?').get(storyId); if (!row) throw error('not_found', 'Story not found.'); return JSON.parse(row.data); }
-  publicStory(story) { const result = copy(story); delete result.suppression; for (const generation of result.generations) { delete generation.context; } return result; }
+  publicStory(story) { const result = copy(story); delete result.suppression; for (const generation of result.generations) { delete generation.context; delete generation.baseSnapshot; } return result; }
   getStory(storyId) { return this.publicStory(this.load(storyId)); }
   library() { const rows = this.db.prepare('SELECT type,data FROM library').all(); return { characters: rows.filter(r => r.type === 'character').map(r => JSON.parse(r.data)), personas: rows.filter(r => r.type === 'persona').map(r => JSON.parse(r.data)), stories: this.db.prepare('SELECT data FROM stories').all().map(r => { const s = JSON.parse(r.data); return { id: s.id, title: s.title, character: s.character, persona: s.persona, revision: s.revision }; }) }; }
   createDefinition(type, data) {
@@ -77,10 +77,19 @@ export class Store {
   }
   createCharacter(data) { return this.createDefinition('character', data); }
   createPersona(data) { return this.createDefinition('persona', data); }
+  updateDefinition(type, recordId, changes) {
+    check(['character','persona'].includes(type)); object(changes,['name','definition','archived',...(type==='character'?['opening']:[])],[]); check(Object.keys(changes).length>0);
+    return this.transaction(()=>{const record=this.definition(recordId,type); if(Object.hasOwn(changes,'name'))record.name=text(changes.name,100); if(Object.hasOwn(changes,'definition'))record.definition=text(changes.definition,8000); if(Object.hasOwn(changes,'archived')){check(typeof changes.archived==='boolean');record.archived=changes.archived;} if(Object.hasOwn(changes,'opening'))record.opening=changes.opening===''?'':text(changes.opening,4000); record.version++; record.updatedAt=now(); this.db.prepare('UPDATE library SET data=? WHERE id=? AND type=?').run(JSON.stringify(record),recordId,type); return record;});
+  }
+  duplicateDefinition(type, recordId) { const source=this.definition(recordId,type); return this.createDefinition(type,{name:source.name,definition:source.definition,...(type==='character'?{opening:source.opening}: {})}); }
+  archiveDefinition(type, recordId, archived) { check(typeof archived==='boolean'); return this.transaction(()=>{const record=this.definition(recordId,type);record.archived=archived;record.version++;this.db.prepare('UPDATE library SET data=? WHERE id=? AND type=?').run(JSON.stringify(record),recordId,type);return record;}); }
+  deleteDefinition(type, recordId) { return this.transaction(()=>{this.definition(recordId,type);this.db.prepare('DELETE FROM library WHERE id=? AND type=?').run(recordId,type);}); }
+
   definition(recordId, type) { const row = this.db.prepare('SELECT data FROM library WHERE id=? AND type=?').get(recordId, type); if (!row) throw error('not_found', 'Definition not found.'); return JSON.parse(row.data); }
   createStory(data) {
     object(data, ['characterId', 'personaId', 'title']);
     const character = this.definition(data.characterId, 'character'); const persona = this.definition(data.personaId, 'persona');
+    check(!character.archived && !persona.archived, 'Archived definitions cannot start a new story.');
     const story = { id: id(), title: text(data.title, 120), character, persona, controls: copy(controlsDefault), revision: 0, scene: null, messages: [], memories: [], threads: [], relationship: [], thoughts: [], summary: '', generations: [], suppression: [] };
     if (character.opening) story.messages.push({ id: id(), role: 'assistant', text: character.opening, createdAt: now() });
     this.save(story); return this.publicStory(story);
@@ -101,7 +110,7 @@ export class Store {
         if (story.scene && originals.some(m => normalized(`${story.scene.text} ${story.scene.fictionalTime}`).includes(normalized(m.text)))) story.scene = null;
       }
       if (Object.hasOwn(changes, 'pinned')) memory.pinned = changes.pinned;
-      memory.revision = ++story.revision; this.summarize(story);
+      memory.ownerRevision = story.revision + 1; memory.revision = ++story.revision; this.summarize(story);
     });
   }
   deleteMemory(storyId, memoryId) { return this.change(storyId, story => {
@@ -113,7 +122,7 @@ export class Store {
   }); }
   deleteStory(storyId) { this.transaction(() => { this.load(storyId); this.db.prepare('DELETE FROM stories WHERE id=?').run(storyId); }); }
   buildContext(story) {
-    const messages = story.messages.slice(-6).map(copy);
+    const messages = story.messages.filter(message => !message.superseded).slice(-6).map(copy);
     const query = normalized(messages.at(-1)?.text ?? '').match(/[\p{L}\p{N}]{3,}/gu) ?? [];
     const score = m => query.reduce((total, word) => total + (normalized(m.text).includes(word) ? 1 : 0), 0);
     const pinned = story.memories.filter(m => m.pinned);
@@ -131,10 +140,39 @@ export class Store {
       if (existing) { check(story.messages.find(m => m.id === existing.userMessageId)?.text === data.text.trim(), 'Request ID already has different text.'); return { generation: copy(existing), context: copy(existing.context) }; }
       if (story.generations.some(g => g.status === 'pending')) throw error('conflict', 'This story already has a pending reply.');
       check(story.messages.length < 20000 && story.generations.length < 10000, 'Prototype story limit reached.');
+      const baseSnapshot = Object.fromEntries(['scene','memories','threads','relationship','thoughts','summary'].map(key=>[key,copy(story[key])]));
       const message = { id: id(), role: 'user', text: text(data.text, 8000), createdAt: now() }; story.messages.push(message);
       const context = this.buildContext(story);
-      const generation = { id: id(), requestId: data.requestId, userMessageId: message.id, status: 'pending', revision: story.revision, createdAt: now(), context };
+      const generation = { id: id(), requestId: data.requestId, userMessageId: message.id, status: 'pending', revision: story.revision, createdAt: now(), context, baseSnapshot };
       story.generations.push(generation); this.save(story); return { generation: copy(generation), context };
+    });
+  }
+  beginReplacement(storyId, data) {
+    object(data,['requestId','generationId','revision','text'],['requestId','generationId','revision']);text(data.requestId,100);text(data.generationId,100);check(Number.isSafeInteger(data.revision)&&data.revision>=0);if(Object.hasOwn(data,'text'))text(data.text,8000);
+    return this.transaction(()=>{
+      const story=this.load(storyId), fingerprint=JSON.stringify([data.requestId,data.generationId,data.revision,Object.hasOwn(data,'text'),data.text??null]);
+      const previous=story.generations.find(g=>g.requestId===data.requestId);
+      if(previous){check(previous.replacementFingerprint===fingerprint,'Request ID already belongs to a different operation.');return {generation:copy(previous),context:copy(previous.context)};}
+      if(story.revision!==data.revision || story.generations.some(g=>g.status==='pending'))throw error('conflict','Story changed or a reply is still pending.');
+      const target=story.generations.filter(g=>g.status!=='superseded').at(-1);
+      if(!target || target.id!==data.generationId)throw error('conflict','Only the latest turn can be replaced.');
+      if(!target.baseSnapshot)throw error('conflict','This older turn predates safe regeneration support. Start a new turn instead.');
+      check(story.generations.length<10000 && story.messages.length<19999,'Story limit reached.');
+      const original=story.messages.find(m=>m.id===target.userMessageId);check(original,'Source turn missing.');
+      const ownerMemories=story.memories.filter(m=>m.ownerRevision && m.ownerRevision>target.revision).map(copy);
+      const base=copy(target.baseSnapshot);
+      for(const key of ['scene','memories','threads','relationship','thoughts','summary'])story[key]=base[key];
+      for(const memory of ownerMemories){story.memories=story.memories.filter(m=>m.id!==memory.id && !(memory.corrected&&normalized(m.key)===normalized(memory.key)));story.memories.push(memory);}
+      const suppressed=entry=>story.suppression.some(s=>normalized(entry.key)===normalized(s.key)||normalized(entry.text).includes(s.text));
+      story.memories=story.memories.filter(m=>m.corrected || !suppressed(m));
+      for(const category of ['threads','relationship','thoughts'])story[category]=story[category].filter(entry=>!suppressed(entry));
+      if(story.scene&&story.suppression.some(s=>normalized(story.scene.text+' '+story.scene.fictionalTime).includes(s.text)))story.scene=null;
+      for(const message of story.messages)if(message.id===target.userMessageId||message.generationId===target.id)message.superseded=true;
+      target.status='superseded';story.revision++;this.summarize(story);
+      const message={id:id(),role:'user',text:Object.hasOwn(data,'text')?text(data.text,8000):original.text,createdAt:now()};story.messages.push(message);
+      const context=this.buildContext(story);
+      const generation={id:id(),requestId:data.requestId,userMessageId:message.id,status:'pending',revision:story.revision,createdAt:now(),context,baseSnapshot:Object.fromEntries(['scene','memories','threads','relationship','thoughts','summary'].map(key=>[key,copy(story[key])])),replaces:target.id,replacementFingerprint:fingerprint};
+      story.generations.push(generation);this.save(story);return {generation:copy(generation),context};
     });
   }
   finishTurn(storyId, generationId, result) {

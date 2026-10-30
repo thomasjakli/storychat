@@ -4,6 +4,7 @@ import { readFile, open } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.mjs';
+import { exportData, importData, MAX_TRANSFER_BYTES } from './transfer.mjs';
 import { createProvider } from './provider.mjs';
 import { protectDirectory } from '../prototype/vault.mjs';
 import { acquireRuntimeLock } from '../prototype/runtime-lock.mjs';
@@ -28,9 +29,9 @@ function publicFailure(error) {
   if (['invalid','not_found','conflict'].includes(code)) return {code, message: code === 'conflict' ? 'The story changed or a turn is already pending. Refresh before continuing.' : code === 'not_found' ? 'That record was not found.' : 'Check the supplied fields and source references.'};
   return {code: 'generation_failed', message: 'The request did not complete and no model state was applied. Check provider access before explicitly retrying.'};
 }
-async function body(req) {
+async function body(req, limit = 32768) {
   let bytes = 0; const chunks = [];
-  for await (const chunk of req) { bytes += chunk.length; if (bytes > 32768) throw fail('invalid','Request too large.'); chunks.push(chunk); }
+  for await (const chunk of req) { bytes += chunk.length; if (bytes > limit) throw fail('invalid','Request too large.'); chunks.push(chunk); }
   try { const value = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error(); return value; }
   catch { throw fail('invalid','Expected JSON object.'); }
 }
@@ -74,6 +75,26 @@ export function createApplication({store, provider, password, origin, secureCook
         if (!authenticated) return send(res,401,{error:{code:'unauthorized',message:'Owner sign-in required.'}});
         if (req.method === 'POST' && path === '/api/logout') { sessions.delete(token); res.setHeader('Set-Cookie',cookie('')); return send(res,200,{authenticated:false}); }
         if (req.method === 'GET' && path === '/api/library') return send(res,200,store.library());
+        if (req.method === 'GET' && path === '/api/export') {
+          if (active) throw fail('conflict','Wait for generation to finish before exporting.');
+          res.setHeader('Content-Disposition','attachment; filename="storychat-export.json"');
+          return send(res,200,exportData(store));
+        }
+        if (req.method === 'POST' && path === '/api/import') {
+          if (active) throw fail('conflict','Wait for generation to finish before importing.');
+          return send(res,201,importData(store,await body(req,MAX_TRANSFER_BYTES)));
+        }
+        const definition = /^\/api\/(characters|personas)\/([a-zA-Z0-9-]+)(?:\/(duplicate))?$/.exec(path);
+        if (definition) {
+          const [,category,recordId,operation]=definition, type=category==='characters'?'character':'persona';
+          if (req.method==='POST' && operation==='duplicate') return send(res,201,store.duplicateDefinition(type,recordId));
+          if (req.method==='DELETE' && !operation) {store.deleteDefinition(type,recordId);return send(res,200,{deleted:true});}
+          if (req.method==='PATCH' && !operation) {
+            const data=await body(req);
+            return send(res,200,store.updateDefinition(type,recordId,data));
+          }
+          return send(res,405,{error:{code:'invalid',message:'Method not supported.'}});
+        }
         const creates = {'/api/characters':'createCharacter','/api/personas':'createPersona','/api/stories':'createStory'};
         if (req.method === 'POST' && creates[path]) return send(res,201,store[creates[path]](await body(req)));
         const match = /^\/api\/stories\/([a-zA-Z0-9-]+)(?:\/(controls|turns|memories)(?:\/([a-zA-Z0-9-]+))?)?$/.exec(path);
@@ -84,17 +105,18 @@ export function createApplication({store, provider, password, origin, secureCook
         if (req.method === 'PATCH' && action === 'controls') return send(res,200,store.setControls(id,await body(req)));
         if (action === 'memories' && memoryId && req.method === 'PATCH') return send(res,200,store.editMemory(id,memoryId,await body(req)));
         if (action === 'memories' && memoryId && req.method === 'DELETE') return send(res,200,store.deleteMemory(id,memoryId));
-        if (req.method === 'POST' && action === 'turns') {
+        if (req.method === 'POST' && action === 'turns' && (!memoryId || memoryId==='replace')) {
           const data = await body(req);
+          const begin = () => memoryId==='replace' ? store.beginReplacement(id,data) : store.beginTurn(id,data);
           const previous = store.getStory(id).generations.find(g=>g.requestId === data.requestId);
-          if (previous) { store.beginTurn(id,data); return send(res,202,{generation:previous}); }
+          if (previous) { begin(); return send(res,202,{generation:previous}); }
           if (active) throw fail('conflict','The instance is already generating.');
           if (provider.unavailable) return send(res,503,{error:publicFailure(provider.unavailable)});
-          const {generation,context} = store.beginTurn(id,data); active=true;
+          const {generation,context} = begin(); active=true;
           const job = Promise.resolve().then(()=>provider.generate(context,{})).then(output=>store.finishTurn(id,generation.id,output)).catch(error=>{
             try {store.failTurn(id,generation.id,publicFailure(error).code);} catch {}
           }).finally(()=>{active=false; jobs.delete(job);}); jobs.add(job);
-          const {context:internalContext,...safeGeneration}=generation;
+          const safeGeneration=store.getStory(id).generations.find(item=>item.id===generation.id);
           return send(res,202,{generation:safeGeneration});
         }
         return send(res,405,{error:{code:'invalid',message:'Method not supported.'}});
