@@ -61,7 +61,7 @@ node app/test.mjs
 node prototype/test.mjs
 ```
 
-The application suite now includes 33 checks: Windows passes 31 with two Linux-only lifecycle checks skipped; Linux is expected to run all 33. The provider-spike suite has 48 checks. See [deployment verification](deployment-verification.md) for actual platform/container results. All ordinary tests use synthetic data, fake/scripted providers and temporary databases. Windows owner-only ACL tests and local HTTP tests require a runtime outside the restricted desktop sandbox; ACLs must not be weakened to run them.
+The application suite now includes 33 checks: Windows passes 31 with two Linux-only lifecycle checks skipped; GitHub's Linux runner passed all 33. The provider-spike suite passed all 48 on both platforms. See [deployment verification](deployment-verification.md) for actual platform/container results. All ordinary tests use synthetic data, fake/scripted providers and temporary databases. Windows owner-only ACL tests and local HTTP tests require a runtime outside the restricted desktop sandbox; ACLs must not be weakened to run them.
 
 The optional live evaluation is **never** included in `test`. With an authorized account configured and app stopped, explicitly set `STORYCHAT_LIVE_EVAL=yes` and run `node app/evaluate-live.mjs`. It sends at most four requests, stopping on the first failed assertion, and keeps only synthetic evaluation data under ignored `data/live-evaluation/`. Seven filler turns are deterministic, so it measures live recall of persisted state without spending seven extra requests. Results are a bounded quality sample; no recurring work is scheduled.
 
@@ -76,3 +76,12 @@ No Docker host, tunnel, DNS, public service, paid fallback or recurring model wo
 ## Container preparation
 
 See [container packaging](../deploy/README.md) for the parameterized Compose stack, image contents, owner-only volumes, manual rollout and lifecycle checks. The public template contains no instance network topology or credentials. GitHub workflow verification and image publication are separate from deploying that image to the owner's host. Same-owner credential handoff and real Android acceptance remain separate steps.
+
+The first verified image is publicly retrievable using either its source-commit tag or digest:
+
+```text
+ghcr.io/thomasjakli/storychat:sha-db6d88ef3453f672c634e59478b1e127b9897a6c
+ghcr.io/thomasjakli/storychat@sha256:aea134ae5b9cb7796f1ef202853ec868dd3dada39461d51bdf3618e5bf6f014c
+```
+
+Use one of these as `STORYCHAT_IMAGE`; a digest pins the exact registry artifact. The image has no ChatGPT session. First-host onboarding and Portainer deployment are still required. No direct live credential copying or already-connected production instance is implied.
