@@ -29,6 +29,7 @@ The deployment serves only its owner. It uses one instance-wide ChatGPT connecti
 - Proceed with the owner's existing ChatGPT allowance through the tested supported sign-in route. No separately billed API or provider fallback is enabled.
 - Allow cloud inference and self-hosted storage; offline-only operation is not required.
 - Provide independent controls for tone, narrative detail, and response length.
+- Next update: English and German interface, English by default, with language preference saved per device/browser profile. Story content is not automatically translated.
 - Agents have creative freedom over the UI. Supplied private screenshots may inform broad interaction and atmosphere, but the interface must be an original design rather than a one-to-one reproduction (owner clarification, 2026-10-30).
 
 ## 3. Delivery and architecture
@@ -282,6 +283,10 @@ The owner selected media incorporation as the next feature on 2026-10-30: charac
 
 Deliver in stages: **4A** private media storage, uploaded covers and backup/restore; **4B** message-linked scene images and a verified image adapter; **4C** short video and optional supported audio. Current ChatGPT plan integration does not support image generation; a subscription-authorized video route has not been established. Real automated generation requires a supported owner-approved media backend. Uploads and manual prompt/result exchange can proceed independently. No separately billed route is enabled or assumed.
 
+### Next update: interface languages - planned
+
+Deliver English/German UI alongside character cover uploads, with English as the default and independent per-device/browser-profile persistence. Language changes preserve drafts, story text, memories and model settings. See [interface language plan](docs/interface-language-plan.md) for storage behavior, translation scope and acceptance checks.
+
 ### Other later enhancements
 
 Saved scene keepsakes; suggested replies; novel-style reading; multiple characters; deeper branching/rewind; generated scene media/gallery; speech/dictation/live calls; native packaging; notifications. Evaluate these individually after the core acceptance criteria pass. No enhancement introduces feature payment or progression gates.
@@ -309,7 +314,7 @@ The source repository is `thomasjakli/storychat`. Final application identity and
 - Finish owner-side export/import and actual-host backup/restore testing. Automated isolated restoration passed; the owner partially tested the manual recovery group and explicitly deferred the remainder without blocking milestone 3. The exact completed subset was not specified.
 - Choose the source license and confirm final application identity.
 - Milestone 4 media planning is defined; media backend selection/access verification remain open. Select other enhancements only when requested.
-- Interface language and additional writing-control options remain optional product preferences. Current defaults are implemented, not unresolved release blockers.
+- English/German UI is confirmed for the next update, default English with per-device persistence. Additional writing-control options remain optional preferences.
 - Deployment storage/backup destinations and external access-policy administration remain private operational choices, not public infrastructure documentation. No independent external-policy audit is claimed.
 
 All three defined milestones are complete. The existing Node 24/SQLite stack, sole-owner login, one ChatGPT connection and browser delivery remain the accepted implementation. Incremental visible answer streaming is not required for now. Do not infer unlimited provider usage or broader security guarantees from owner acceptance.
