@@ -6,13 +6,13 @@ The application has no in-app payments, premium tiers, virtual currency, or paid
 
 ## Current stage
 
-Milestone 1 personal provider feasibility is complete and pushed. Milestone 2 has a working Node 24/SQLite continuity prototype and original browser interface, 27 passing automated checks and a bounded successful live ChatGPT scenario. Real Android acceptance is pending an owner-selected device-accessible route. Docker deployment and a finished installable Android experience remain ahead.
+Milestone 1 personal provider feasibility is complete and pushed. Milestone 2 has a working Node 24/SQLite continuity prototype, original browser interface, automated continuity checks and a bounded successful live ChatGPT scenario. Real Android acceptance remains pending. A Linux/amd64 image, Portainer-compatible Compose configuration and encrypted credential-handoff helper prepare the project for personal deployment; a finished installable Android experience remains ahead.
 
-The app has one owner login and one protected ChatGPT connection. It persists independent stories, source-linked memories, promises, relationships and fictional thoughts. The owner can inspect, correct, pin and remove memories. Explicit fake mode supports development without model calls. No separately billed API route exists. Local command-line onboarding is verified; phone-only provider sign-in and same-owner credential transfer to Docker remain untested.
+The app has one owner login and one protected ChatGPT connection. It persists independent stories, source-linked memories, promises, relationships and fictional thoughts. The owner can inspect, correct, pin and remove memories. Explicit fake mode supports development without model calls. No separately billed API route exists. Local command-line onboarding is verified; handoff tests use synthetic credentials. Actual-host subscription access and phone-only provider sign-in are unverified.
 
 Use [running instructions](docs/running.md) for startup, configuration, tests and the real-device checklist. No dependency installation or frontend build is required.
 
-Docker packaging and a GitHub verification/publication workflow are also available; see the [container guide](deploy/README.md) and [deployment evidence](docs/deployment-verification.md). They do not configure an owner instance or transfer ChatGPT credentials. The current application suite adds lifecycle checks to the original continuity tests; platform-specific results are recorded in the evidence report.
+Follow the [first-deployment guide](docs/first-deployment.md) for Portainer setup, same-owner session handoff and activation. The [container guide](deploy/README.md) and [deployment evidence](docs/deployment-verification.md) explain packaging and verified platform results. Publishing an image does not deploy an owner instance or authorize its provider connection.
 
 ## Documents
 

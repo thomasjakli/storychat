@@ -30,6 +30,7 @@ STORYCHAT_TEST_IMAGE=storychat:verification node deploy/container-smoke.mjs
 | Interrupted attempt | A stopped server's synthetic database is seeded with a pending attempt; startup marks it interrupted without applying new state or issuing inference. |
 | Replacement | Remove the application container and recreate it with the same named volumes; previously corrected/pinned state and interrupted status remain. |
 | Provider-vault lifecycle | A separate synthetic encrypted vault refuses a concurrent holder, survives SIGKILL of its first holder, reacquires the same persistent lock, decrypts fake credentials, and saves a replacement fake token. Ciphertext must omit the known plaintext marker and the key must have mode 0600. This tests storage/locking, not provider acceptance. |
+| Encrypted CLI handoff | The current harness prepares a recipient request, exports one synthetic source registration, imports it through the actual CLI's bounded stdin route, inspects sanitized account status, and verifies source disconnection and destination host preservation. After a further container replacement, the consumed ledger and rotated synthetic token survive and identical-bundle replay remains a harmless no-op. This added stage requires its own Linux CI pass. |
 
 The script creates randomly named containers/volumes bearing a per-run label. Cleanup targets only exact names created during that invocation with the matching label. Failed synthetic container logs and a sanitized result record remain in the artifact directory; cleanup is best effort if the daemon itself becomes unavailable. It does not prune unrelated resources or remove an input image.
 
@@ -49,7 +50,7 @@ The workflow was reviewed for publication boundaries: verification uses read-onl
 - Complete supported same-owner ChatGPT session handoff and bounded actual-host provider checks; the synthetic vault test does not transfer or authorize a real session.
 - Complete real Android creation/chat/memory acceptance through the owner's chosen route. No container or desktop test establishes Android keyboard, background recovery, or home-screen installation.
 
-## Linux CI outcome
+## Prior Linux CI outcome — container baseline
 
 The reviewer independently fetched and inspected job logs from [workflow run 41102134906](https://github.com/thomasjakli/storychat/actions/runs/41102134906), for commit `db6d88ef3453f672c634e59478b1e127b9897a6c`, on 2026-10-30. Log inspection was limited to test summaries, smoke stages, build warnings and publication results; no provider credentials or private runtime files were requested.
 
@@ -65,3 +66,15 @@ sha256:aea134ae5b9cb7796f1ef202853ec868dd3dada39461d51bdf3618e5bf6f014c
 Both build logs contain a BuildKit `SecretsUsedInArgOrEnv` heuristic warning for `STORYCHAT_KEY_DIR`. Review confirms that value is a public directory path, not encryption-key material; no key or credentials were supplied to the build. The warning was not suppressed.
 
 Separately, the coordinator reports an anonymous GHCR manifest/config probe matching that digest and confirming Linux amd64 and UID 1000. This reviewer verified the workflow build/smoke/push logs, not that separate anonymous registry probe. A published and tested image does not establish deployment on the owner's VM, actual protected-volume configuration, trusted ingress, provider-session handoff, backups, or Android acceptance; those remain separate gates.
+
+## Encrypted handoff revision — local evidence
+
+The subsequent revision adds `prototype/handoff.mjs` to the runtime allowlist, changing the exact image file count from 17 to 18. The smoke harness now contains nine embedded Node modules; all nine and the outer module pass independent syntax checks. Its actual CLI handoff stage uses a fresh ephemeral synthetic source and a separate target inside the generated provider/key volumes. Every container remains network-isolated; no real account, provider authorization, revocation, or inference is used.
+
+On Windows with bundled Node 24.22.1 outside the managed sandbox, the full `node prototype/test.mjs` suite passed **58 tests, 0 failed, 0 skipped**. Ten new handoff scenarios include three independently authored adversarial cases. Checks cover recipient/host binding, selected-account movement without altering another registration, encrypted bundle/journal contents, tampering, invalid/expired input, active-runtime refusal, pre-existing destination credentials, safe publication, interrupted export recovery, lost recipient keys, and replay after token rotation. Both original source and destination host identities remain unchanged. Failed publication disconnects the selected source once and retains identical recovery ciphertext; repeated publication is idempotent. Identical consumed-bundle import is an explicit no-op and cannot restore stale tokens.
+
+Final independent review found one source-reauthorization edge: retrying an old export journal after the source had acquired fresh credentials could republish stale ciphertext while incorrectly reporting that the source was disconnected. The implementation now refuses that retry before mutation/publication with `handoff_source_active`. Both the independent scenario and a dedicated regression verify preservation of the new source credentials and existing output; this fix is included in the 58-test passing run.
+
+Code review confirms RSA-3072 OAEP/SHA-256 with AES-256-GCM and authenticated recipient/lifetime headers, bounded input, an encrypted source journal committed atomically with local token removal, and an encrypted destination replay ledger committed with credentials before private-key deletion. Request/bundle transport still requires an authenticated channel: encryption does not authenticate a substituted recipient request. Those are bounded original implementation checks, not a claim of a general cryptographic audit.
+
+The earlier Linux baseline run above does **not** verify this new handoff revision. Its Linux build/smoke/publication outcome is pending; real same-owner credential transfer, actual-host provider renewal, owner ingress, backups, and Android acceptance remain unverified.

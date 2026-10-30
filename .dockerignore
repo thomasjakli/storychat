@@ -12,6 +12,7 @@ prototype/**
 !prototype/auth.mjs
 !prototype/cli.mjs
 !prototype/errors.mjs
+!prototype/handoff.mjs
 !prototype/output.mjs
 !prototype/provider.mjs
 !prototype/runtime-lock.mjs

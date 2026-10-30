@@ -2,6 +2,8 @@
 
 The image runs the single-owner application on Linux/amd64 using Node 24 and built-in SQLite. Compose supplies an HTTP origin service behind an owner-managed HTTPS route. It creates no tunnel, proxy, DNS records, provider authorization or paid resources.
 
+For the complete Portainer, local sign-in, encrypted same-owner session handoff and first-device checklist, follow [First personal deployment](../docs/first-deployment.md). Use a verified release containing the handoff helper; older packaging-only images do not provide it. The actual owner-host transfer and Android checks remain separate from synthetic CI evidence.
+
 The exact base is `node:24.22.2-bookworm-slim`, present for amd64 in the [Docker Official Images manifest](https://github.com/docker-library/official-images/blob/master/library/node) when checked on 2026-10-30. This is a maintained patch update from the local Node 24.22.1 test runtime. `util-linux` is installed explicitly for `flock`; its availability is asserted during build. Container execution and patch compatibility must pass the release checks before publishing an image.
 
 ## Image contents and build
@@ -68,3 +70,11 @@ The checkout and Node setup actions are pinned to reviewed commit SHAs. Verifica
 Workflows are restricted to public repositories and standard `ubuntu-24.04` runners. No larger runners, caches or retained Actions artifacts are configured. Standard runners in public repositories and GHCR container storage/bandwidth are currently free, per GitHub documentation checked on 2026-10-30; no billing settings are changed. Reassess if repository visibility or provider billing policies change. [Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions), [Packages billing](https://docs.github.com/en/billing/concepts/product-billing/github-packages).
 
 New GHCR packages may initially require authentication even when their source repository is public. Verify anonymous pulling separately; if needed, the owner can set package visibility to Public in GitHub's package settings, or configure a narrowly scoped registry credential in Portainer. Never make provider secrets part of a package to enable deployment. A successful push proves image publication, not anonymous availability or a deployed owner instance.
+
+## Same-owner credential handoff
+
+The supported local browser sign-in remains on the owner's PC. The destination helper creates a one-time, 24-hour recipient request; the PC moves only the selected registration into a recipient-encrypted bundle, atomically disconnecting its local renewable session. Authenticated SCP carries the public request and encrypted bundle. Destination import uses bounded stdin through `docker exec -i` as UID 1000, preserving the server's own host identity and key. No plaintext session is uploaded to the app browser or baked into an image.
+
+The running service must remain unconfigured for ChatGPT during first import. After import succeeds, set its account ID/model in the private Portainer environment and redeploy without deleting volumes. The server then owns refresh; never operate both PC and server from cloned tokens. Exact same-request re-export and same-bundle import are recoverable within the lifetime, while consumed-request records prevent rollback of refreshed sessions. Follow the first-deployment guide for expiry and recovery instructions rather than resetting runtime files.
+
+Transfer output directories must exist and be dedicated to this app. The guide prepares `/var/lib/storychat/provider/handoff` as UID 1000 and uses `docker cp` only to retrieve the public request; inbound transfer bytes use stdin, avoiding root-owned files in protected volumes. No root application process or recursive ownership change is necessary.

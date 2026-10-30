@@ -13,7 +13,7 @@ WORKDIR /app
 
 # Exact runtime sources only. Private files must never enter the build context.
 COPY app/server.mjs app/store.mjs app/provider.mjs ./app/
-COPY prototype/auth.mjs prototype/cli.mjs prototype/errors.mjs prototype/output.mjs prototype/provider.mjs prototype/runtime-lock.mjs prototype/stream.mjs prototype/vault.mjs ./prototype/
+COPY prototype/auth.mjs prototype/cli.mjs prototype/errors.mjs prototype/handoff.mjs prototype/output.mjs prototype/provider.mjs prototype/runtime-lock.mjs prototype/stream.mjs prototype/vault.mjs ./prototype/
 COPY public/index.html public/style.css public/app.js public/icon.svg public/manifest.webmanifest ./public/
 COPY deploy/healthcheck.mjs ./deploy/
 

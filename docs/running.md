@@ -42,7 +42,7 @@ node app/server.mjs
 
 For an existing registration, use `auth <selected-account-id>` instead of creating a new one. Do not paste tokens or callback URLs into chat. Configure one account ID and one model explicitly. ChatGPT is the default mode; missing configuration/sign-in keeps existing stories readable and reports an actionable error. There is no fallback provider or automatic inference retry. Requests use the same owner's ChatGPT allowance. Manage connected sessions and allowance in the provider's settings.
 
-The browser receives app session cookies, never provider credentials. Default encrypted tokens live in ignored `data/provider-spike/`; their separately protected key lives in ignored `secrets/provider-spike/`. `STORYCHAT_DATA_DIR` and `STORYCHAT_KEY_DIR` override those provider paths. Only the server process renews the selected session; do not clone rotating credentials across active processes or hosts. Same-owner Docker handoff is documented as future work, not implemented by these commands.
+The browser receives app session cookies, never provider credentials. Default encrypted tokens live in ignored `data/provider-spike/`; their separately protected key lives in ignored `secrets/provider-spike/`. `STORYCHAT_DATA_DIR` and `STORYCHAT_KEY_DIR` override those provider paths. Only the server process renews the selected session; do not clone rotating credentials across active processes or hosts. For Docker, follow the [first-deployment guide](first-deployment.md): the handoff helper encrypts a selected session for the destination, disables its source copy and preserves the destination's host identity. Transfer requests and bundles through authenticated SSH; never copy whole vaults or keys.
 
 ## Persistence and recovery
 
@@ -61,7 +61,7 @@ node app/test.mjs
 node prototype/test.mjs
 ```
 
-The application suite now includes 33 checks: Windows passes 31 with two Linux-only lifecycle checks skipped; GitHub's Linux runner passed all 33. The provider-spike suite passed all 48 on both platforms. See [deployment verification](deployment-verification.md) for actual platform/container results. All ordinary tests use synthetic data, fake/scripted providers and temporary databases. Windows owner-only ACL tests and local HTTP tests require a runtime outside the restricted desktop sandbox; ACLs must not be weakened to run them.
+The application suite includes 33 checks: Windows passes 31 with two Linux-only lifecycle checks skipped; the prior GitHub Linux runner passed all 33. The expanded provider suite passes 58 synthetic checks on Windows, including ten handoff and independent adversarial scenarios. Linux handoff/container evidence is recorded separately in [deployment verification](deployment-verification.md). All ordinary tests use synthetic data, fake/scripted providers and temporary databases. Windows owner-only ACL tests and local HTTP tests require a runtime outside the restricted desktop sandbox; ACLs must not be weakened to run them.
 
 The optional live evaluation is **never** included in `test`. With an authorized account configured and app stopped, explicitly set `STORYCHAT_LIVE_EVAL=yes` and run `node app/evaluate-live.mjs`. It sends at most four requests, stopping on the first failed assertion, and keeps only synthetic evaluation data under ignored `data/live-evaluation/`. Seven filler turns are deterministic, so it measures live recall of persisted state without spending seven extra requests. Results are a bounded quality sample; no recurring work is scheduled.
 
@@ -75,7 +75,7 @@ No Docker host, tunnel, DNS, public service, paid fallback or recurring model wo
 
 ## Container preparation
 
-See [container packaging](../deploy/README.md) for the parameterized Compose stack, image contents, owner-only volumes, manual rollout and lifecycle checks. The public template contains no instance network topology or credentials. GitHub workflow verification and image publication are separate from deploying that image to the owner's host. Same-owner credential handoff and real Android acceptance remain separate steps.
+See [container packaging](../deploy/README.md) and the [first-deployment guide](first-deployment.md) for the Compose stack, Portainer settings, encrypted credential handoff and activation. The public template contains no instance network topology or credentials. GitHub workflow verification and image publication are separate from deploying that image to the owner's host. Actual-owner handoff and real Android acceptance remain separate steps.
 
 The first verified image is publicly retrievable using either its source-commit tag or digest:
 
@@ -84,4 +84,4 @@ ghcr.io/thomasjakli/storychat:sha-db6d88ef3453f672c634e59478b1e127b9897a6c
 ghcr.io/thomasjakli/storychat@sha256:aea134ae5b9cb7796f1ef202853ec868dd3dada39461d51bdf3618e5bf6f014c
 ```
 
-Use one of these as `STORYCHAT_IMAGE`; a digest pins the exact registry artifact. The image has no ChatGPT session. First-host onboarding and Portainer deployment are still required. No direct live credential copying or already-connected production instance is implied.
+This historical image predates the handoff helper. Use the newer handoff release recorded in the deployment verification report for first deployment. An image contains no ChatGPT session; host onboarding and Portainer deployment are still required.

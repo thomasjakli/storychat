@@ -46,6 +46,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.22.2'
+          package-manager-cache: false
       - name: Synthetic application checks
         run: node app/test.mjs
       - name: Synthetic subscription-adapter checks
@@ -78,6 +79,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.22.2'
+          package-manager-cache: false
       # Rebuild and test in this job so exactly the exercised image is published.
       # No Actions artifact upload or cache storage is required between jobs.
       - name: Build publish candidate

@@ -5,8 +5,9 @@ import { Vault } from './vault.mjs';
 import { signIn } from './auth.mjs';
 import { ChatGPTProvider, FakeProvider } from './provider.mjs';
 import { ProviderError } from './errors.mjs';
+import { prepareHandoff, exportHandoff, importHandoff } from './handoff.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
-const [command, accountId, model] = process.argv.slice(2);
+const [command, accountId, model, bundleOutput] = process.argv.slice(2);
 const help = `Storychat subscription-only feasibility CLI
   node prototype/cli.mjs init
   node prototype/cli.mjs auth [saved-account-id]
@@ -15,6 +16,9 @@ const help = `Storychat subscription-only feasibility CLI
   node prototype/cli.mjs probe <account-id> <model-slug>
   node prototype/cli.mjs refresh <account-id>
   node prototype/cli.mjs revoke <account-id>
+  node prototype/cli.mjs handoff-prepare <request-output>
+  node prototype/cli.mjs handoff-export <account-id> <request-file> <bundle-output>
+  node prototype/cli.mjs handoff-import <bundle-file|->
   node prototype/cli.mjs fake [success|denied|interrupted|invalid]
 No API-key route or paid fallback. Probe sends one synthetic request using your ChatGPT plan.
 Manage usage: https://chatgpt.com/#settings/Usage`;
@@ -24,8 +28,11 @@ async function main() {
     const result = await new FakeProvider(accountId).generate();
     console.log('DETERMINISTIC FAKE; no network or subscription used.'); console.log(JSON.stringify(result, null, 2)); return;
   }
-  if (!['init', 'auth', 'accounts', 'models', 'probe', 'refresh', 'revoke'].includes(command)) throw new Error('Unknown command. Use help.');
+  if (!['init', 'auth', 'accounts', 'models', 'probe', 'refresh', 'revoke', 'handoff-prepare', 'handoff-export', 'handoff-import'].includes(command)) throw new Error('Unknown command. Use help.');
   const vault = new Vault(process.env.STORYCHAT_DATA_DIR ?? resolve(root, 'data/provider-spike'), process.env.STORYCHAT_KEY_DIR ?? resolve(root, 'secrets/provider-spike'));
+  if (command === 'handoff-prepare') { console.log(JSON.stringify(await prepareHandoff(vault, accountId))); return; }
+  if (command === 'handoff-export') { console.log(JSON.stringify(await exportHandoff(vault, accountId, model, bundleOutput))); return; }
+  if (command === 'handoff-import') { console.log(JSON.stringify(await importHandoff(vault, accountId))); return; }
   await vault.locked(async () => {
     const data = await vault.load(); await vault.save(data); // Persist host identity before first authorization.
     if (command === 'init') { console.log('Protected runtime initialized; no account authorized.'); return; }

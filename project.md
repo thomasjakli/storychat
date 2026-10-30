@@ -1,6 +1,6 @@
 # Self-hosted Character Stories — Project Specification
 
-Status: Milestone 1 complete and pushed. Milestone 2 continuity implementation and bounded live evaluation pass; real Android acceptance remains pending. Docker packaging and a published Linux/amd64 image are verified through GitHub CI. Personal host deployment and credential handoff remain ahead.
+Status: Milestone 1 complete and pushed. Milestone 2 continuity implementation and bounded live evaluation pass; real Android acceptance remains pending. Docker packaging and a published Linux/amd64 image are verified through GitHub CI. Encrypted same-owner credential handoff is implemented with synthetic tests; the updated container run and personal-host deployment are separate verification gates.
 Last reviewed: 2026-10-30.
 
 This document describes the intended product and acceptance criteria. **Confirmed** requirements come from the owner. **Proposed** choices remain implementation recommendations. **Unverified** integration assumptions need a live test. Documentation notes are dated research, not proof of account access.
@@ -295,7 +295,7 @@ The source repository is `thomasjakli/storychat`. Final application identity and
 
 - Ubuntu Server versus Debian for the local amd64 Docker VM; connection/deployment method, storage paths, and backup destination.
 - Owner-managed ingress verification, owner-only Access policy and production app login configuration; private infrastructure topology is intentionally excluded from public source and documentation.
-- Secure same-owner ChatGPT session-handoff implementation for the selected local Docker host; ChatGPT remains the selected provider.
+- Verify the implemented encrypted same-owner ChatGPT handoff on the selected personal host; ChatGPT remains the selected provider. The helper uses destination-bound encryption, a 24-hour request, atomic source disconnection/recovery journal and replay-safe import while preserving host identity. Synthetic Windows tests pass; actual host authorization and inference remain unverified. Follow [first deployment](docs/first-deployment.md), including authenticated SSH transfer and single refresh ownership.
 - Prototype owner login uses a configured password, scrypt verification, in-memory eight-hour HttpOnly/SameSite sessions, origin checks and login throttling. Remote binding requires a configured HTTPS origin; production/proxy review remains milestone 3. Prototype generation concurrency is one and context has a 120,000-character ceiling. Multi-user access is outside the scope.
 - Acceptance of PWA delivery for the first release.
 - Interface language and original initial character/story; support German story text without deriving a UI-language requirement from private examples.

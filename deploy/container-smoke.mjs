@@ -94,7 +94,7 @@ try {
     assert.equal(process.getuid(),1000);
     const forbidden=/(^|\/)(analysis|tests|data|secrets|\.git|node_modules)(\/|$)|screenshots|\.apk$|\.env|evaluate-live/i;
     const files=[];function walk(path){for(const name of readdirSync(path)){const target=path+'/'+name;assert.ok(!forbidden.test(target), 'Excluded file in image: '+target);if(statSync(target).isDirectory())walk(target);else files.push(target.slice(5));}}
-    walk('/app');assert.deepEqual(files.sort(),['app/provider.mjs','app/server.mjs','app/store.mjs','deploy/healthcheck.mjs','prototype/auth.mjs','prototype/cli.mjs','prototype/errors.mjs','prototype/output.mjs','prototype/provider.mjs','prototype/runtime-lock.mjs','prototype/stream.mjs','prototype/vault.mjs','public/app.js','public/icon.svg','public/index.html','public/manifest.webmanifest','public/style.css'].sort());assert.throws(()=>writeFileSync('/app/qa-write','blocked'));
+    walk('/app');assert.deepEqual(files.sort(),['app/provider.mjs','app/server.mjs','app/store.mjs','deploy/healthcheck.mjs','prototype/auth.mjs','prototype/cli.mjs','prototype/errors.mjs','prototype/handoff.mjs','prototype/output.mjs','prototype/provider.mjs','prototype/runtime-lock.mjs','prototype/stream.mjs','prototype/vault.mjs','public/app.js','public/icon.svg','public/index.html','public/manifest.webmanifest','public/style.css'].sort());assert.throws(()=>writeFileSync('/app/qa-write','blocked'));
     for(const path of ['/var/lib/storychat/stories','/var/lib/storychat/provider','/var/lib/storychat/keys']){const s=statSync(path);assert.equal(s.uid,1000);assert.equal(s.mode&0o777,0o700);}
   `]);
   assert.equal(docker(['wait', inspectName]).stdout.trim(), '0');
@@ -189,8 +189,51 @@ try {
     await vault.locked(async()=>{const data=await vault.load();assert.equal(data.accounts.qa.refresh_token,'SYNTHETIC_REFRESH_ONLY');assert.ok(!readFileSync(vault.file).includes(Buffer.from('SYNTHETIC_')));assert.equal(statSync(vault.keyFile).mode&0o777,0o600);data.accounts.qa.refresh_token='SYNTHETIC_ROTATED_ONLY';await vault.save(data);});
   `]);
   assert.equal(docker(['wait', recovered], { timeout: 30000 }).stdout.trim(), '0'); removeContainer(recovered);
-  console.log('Container QA passed: Linux amd64, non-root/read-only image, password file, auth, durable state, restart, SIGKILL, interruption, replacement and synthetic vault. No live inference.');
-  writeFileSync(join(artifacts, 'result.json'), JSON.stringify({ passed: true, image, platform: 'linux/amd64', liveInference: false, checks: ['image-boundaries', 'non-root', 'read-only', 'password-file', 'owner-auth', 'fake-state', 'correction-pin-controls', 'restart', 'parallel-refusal', 'SIGKILL', 'interrupted-recovery', 'replacement', 'synthetic-vault-exclusivity-and-recovery'] }, null, 2));
+
+  step('actual CLI encrypted handoff with synthetic source and persistent target');
+  const handoff = runContainer(`${prefix}-handoff`, mounts, ['node', '--input-type=module', '-e', String.raw`
+    import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import {execFileSync} from 'node:child_process';import {readFileSync,writeFileSync,existsSync} from 'node:fs';import {Vault} from './prototype/vault.mjs';
+    const targetEnvironment={...process.env,STORYCHAT_DATA_DIR:'/var/lib/storychat/provider/qa-handoff-target',STORYCHAT_KEY_DIR:'/var/lib/storychat/keys/qa-handoff-target'};
+    const sourceEnvironment={...process.env,STORYCHAT_DATA_DIR:'/tmp/qa-handoff-source',STORYCHAT_KEY_DIR:'/tmp/qa-handoff-source-key'};
+    const target=new Vault(targetEnvironment.STORYCHAT_DATA_DIR,targetEnvironment.STORYCHAT_KEY_DIR),source=new Vault(sourceEnvironment.STORYCHAT_DATA_DIR,sourceEnvironment.STORYCHAT_KEY_DIR);
+    const marker='SYNTHETIC_HANDOFF_TOKEN_ONLY';const account={client_id:'synthetic-handoff-client',subject:'synthetic-handoff-subject',issuer:'https://auth.openai.com',scopes:['chatgpt.tokens.use.direct'],expires_at:Date.now()+3600000,access_token:marker+'_ACCESS',refresh_token:marker+'_REFRESH',id_token:marker+'_ID'};
+    // The NUL separator must match the existing onboarding identity convention.
+    const realAccountId=createHash('sha256').update(account.client_id+String.fromCharCode(0)+account.subject).digest('hex').slice(0,16);
+    function cli(environment,args,input){const output=execFileSync(process.execPath,['prototype/cli.mjs',...args],{env:environment,encoding:'utf8',...(input?{input}:{})});assert.ok(!output.includes(marker));assert.ok(!output.includes('PRIVATE KEY'));return JSON.parse(output);}
+    await target.locked(async()=>{await target.save(await target.load());});
+    const before=await target.locked(()=>target.load());
+    await source.locked(async()=>{const data=await source.load();data.accounts[realAccountId]=account;await source.save(data);});
+    const sourceBefore=await source.locked(()=>source.load());
+    const request='/var/lib/storychat/provider/qa-handoff-request.json',bundle='/var/lib/storychat/provider/qa-handoff-bundle.json';
+    const prepared=cli(targetEnvironment,['handoff-prepare',request]);assert.equal(prepared.targetHostId,before.hostId);
+    const exported=cli(sourceEnvironment,['handoff-export',realAccountId,request,bundle]);assert.equal(exported.sourceDisconnected,true);
+    const sourceAfter=await source.locked(()=>source.load());assert.equal(sourceAfter.hostId,sourceBefore.hostId);assert.ok(!sourceAfter.accounts[realAccountId].refresh_token);
+    const publicData=readFileSync(request,'utf8')+readFileSync(bundle,'utf8');assert.ok(!publicData.includes(marker));assert.ok(!publicData.includes('PRIVATE KEY'));
+    const imported=cli(targetEnvironment,['handoff-import','-'],readFileSync(bundle));assert.equal(imported.accountId,realAccountId);assert.equal(imported.alreadyImported,false);
+    const status=cli(targetEnvironment,['accounts']);assert.equal(status[0].connected,true);
+    await target.locked(async()=>{const data=await target.load();assert.equal(data.hostId,before.hostId);assert.equal(data.accounts[realAccountId].refresh_token,marker+'_REFRESH');data.accounts[realAccountId].refresh_token=marker+'_ROTATED';await target.save(data);});
+    const replay=cli(targetEnvironment,['handoff-import',bundle]);assert.equal(replay.alreadyImported,true);
+    assert.ok(!existsSync(target.keyDirectory+'/handoff-'+prepared.requestId+'.pem'));
+    writeFileSync('/var/lib/storychat/provider/qa-handoff-check.json',JSON.stringify({hostId:before.hostId,accountId:realAccountId,requestId:prepared.requestId}),{mode:0o600});
+  `]);
+  assert.equal(docker(['wait', handoff], { timeout: 60000 }).stdout.trim(), '0'); removeContainer(handoff);
+  assert.ok(!JSON.stringify(request(main, '/api/session').body).includes('handoff'));
+  docker(['stop', '--time', '150', main]); removeContainer(main);
+  main = runContainer(`${prefix}-handoff-replacement`, [...mounts, ...environment]);
+  await healthy(main); login(main);
+  assert.deepEqual(snapshot(request(main, path).body), expected);
+  const persistedHandoff = runContainer(`${prefix}-handoff-persisted`, mounts, ['node', '--input-type=module', '-e', String.raw`
+    import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {execFileSync} from 'node:child_process';import {Vault} from './prototype/vault.mjs';
+    const environment={...process.env,STORYCHAT_DATA_DIR:'/var/lib/storychat/provider/qa-handoff-target',STORYCHAT_KEY_DIR:'/var/lib/storychat/keys/qa-handoff-target'};
+    const expected=JSON.parse(readFileSync('/var/lib/storychat/provider/qa-handoff-check.json','utf8'));
+    const vault=new Vault(environment.STORYCHAT_DATA_DIR,environment.STORYCHAT_KEY_DIR);
+    await vault.locked(async()=>{const data=await vault.load();assert.equal(data.hostId,expected.hostId);assert.equal(data.handoff.requests[expected.requestId].state,'consumed');assert.equal(data.accounts[expected.accountId].refresh_token,'SYNTHETIC_HANDOFF_TOKEN_ONLY_ROTATED');});
+    const output=execFileSync(process.execPath,['prototype/cli.mjs','handoff-import','/var/lib/storychat/provider/qa-handoff-bundle.json'],{env:environment,encoding:'utf8'});assert.equal(JSON.parse(output).alreadyImported,true);assert.ok(!output.includes('SYNTHETIC_HANDOFF_TOKEN_ONLY'));
+    await vault.locked(async()=>{assert.equal((await vault.load()).accounts[expected.accountId].refresh_token,'SYNTHETIC_HANDOFF_TOKEN_ONLY_ROTATED');});
+  `]);
+  assert.equal(docker(['wait', persistedHandoff], { timeout: 60000 }).stdout.trim(), '0'); removeContainer(persistedHandoff);
+  console.log('Container QA passed: Linux amd64, non-root/read-only image, password file, auth, durable state, restart, SIGKILL, interruption, replacement, synthetic vault and encrypted CLI handoff. No live inference.');
+  writeFileSync(join(artifacts, 'result.json'), JSON.stringify({ passed: true, image, platform: 'linux/amd64', liveInference: false, checks: ['image-boundaries', 'non-root', 'read-only', 'password-file', 'owner-auth', 'fake-state', 'correction-pin-controls', 'restart', 'parallel-refusal', 'SIGKILL', 'interrupted-recovery', 'replacement', 'synthetic-vault-exclusivity-and-recovery', 'encrypted-cli-handoff', 'handoff-replay-after-replacement'] }, null, 2));
 } catch (error) {
   console.error(`Container QA failed during ${stage}: ${String(error.message).replaceAll(password, '[synthetic password]')}`);
   for (const name of containers) if (own(name, 'container')) {
