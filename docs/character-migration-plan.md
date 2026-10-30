@@ -47,3 +47,6 @@ Proposed limits: intro 4,000 characters; opening 12,000 characters to accommodat
 - The actual character trial is owner-run/private; ordinary tests use synthetic characters. No mass migration, production overwrite, model request or media generation is authorized by this planning entry.
 
 Message-based image/video generation stays shelved pending provider discussion. This trial does not add voice selection, public character publication, multi-character stories, tags or arbitrary HTML simply because those controls appear in reference material.
+
+
+Implementation update (2026-10-31): active local-character/cover/localization scope implemented with synthetic verification; see project.md for evidence and pending Android acceptance. Earlier proposals describe the design baseline, not proof of device acceptance. External retrieval, private character trial and generation remain deferred.

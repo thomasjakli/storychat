@@ -83,3 +83,6 @@ Existing duplicate IDs remain a hard conflict in ordinary story backup import. C
 Product/Architecture owns schema/API contracts and scope; Story/Memory owns snapshot/context and legacy migration; Android Experience owns navigation/cards/details and bilingual forms; Self-hosting/Security owns uploads/media/reference-aware backups; Model Integration verifies no unintended model calls or provider changes; Quality independently verifies migration, query behavior, isolation and device evidence. Agree distinct ownership before implementation.
 
 Open product proposals: exact navigation labels/default, category/tag vocabulary, maximum field sizes and draft editing experience. The separate explorer, covers, intro/opening/gender and English/German interface are requested scope; remote social features, automatic crawling, message-media generation and whole-story migration are not implied.
+
+
+Implementation update (2026-10-31): active local-character/cover/localization scope implemented with synthetic verification; see project.md for evidence and pending Android acceptance. Earlier proposals describe the design baseline, not proof of device acceptance. External retrieval, private character trial and generation remain deferred.

@@ -32,3 +32,11 @@ public/**
 deploy/**
 !deploy/healthcheck.mjs
 !deploy/connect-chatgpt.sh
+
+!package.json
+!package-lock.json
+!app/media.mjs
+!app/media-transfer.mjs
+
+!public/explorer.js
+!public/i18n.js

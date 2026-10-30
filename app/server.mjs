@@ -4,7 +4,9 @@ import { readFile, open } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.mjs';
-import { exportData, importData, MAX_TRANSFER_BYTES } from './transfer.mjs';
+import {exportBundle,splitBundle,stageBundle} from './media-transfer.mjs';
+import { MediaStore, MAX_UPLOAD_BYTES, MAX_MEDIA_BACKUP_BYTES, collectMediaReferences } from './media.mjs';
+import { exportData, importData, MAX_TRANSFER_BYTES, validateTransfer } from './transfer.mjs';
 import { createProvider } from './provider.mjs';
 import { protectDirectory } from '../prototype/vault.mjs';
 import { acquireRuntimeLock } from '../prototype/runtime-lock.mjs';
@@ -38,16 +40,18 @@ async function body(req, limit = 32768) {
 function send(res,status,data) { res.writeHead(status, {'Content-Type':'application/json; charset=utf-8'}); res.end(JSON.stringify(data)); }
 
 /** Injectable store/provider make HTTP tests deterministic without live credentials. */
-export function createApplication({store, provider, password, origin, secureCookies = false, shutdownTimeoutMs = 130000}) {
+export function createApplication({store, provider, password, origin, secureCookies = false, shutdownTimeoutMs = 130000, media}) {
   if (typeof password !== 'string' || password.length < 12 || password.length > 256) throw new Error('Set STORYCHAT_PASSWORD to a unique password of 12–256 characters.');
   const salt = randomBytes(32), hash = scryptSync(password,salt,32);
   const sessions = new Map(), failures = new Map(), jobs = new Set();
+  let importing=false, mutationTail=Promise.resolve();
   let active = false, stopping = false, closing;
   const server = http.createServer(async (req,res) => {
     res.setHeader('Cache-Control','no-store'); res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','no-referrer'); res.setHeader('X-Frame-Options','DENY');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     if (stopping) return send(res,503,{error:{code:'shutting_down',message:'The server is stopping. Your saved story is preserved.'}});
+    let releaseMutation;
     try {
       const url = new URL(req.url,'http://localhost'), path = url.pathname;
       const expectedOrigin = origin || `http://${server.address().address === '::1' ? '[::1]' : '127.0.0.1'}:${server.address().port}`;
@@ -73,30 +77,59 @@ export function createApplication({store, provider, password, origin, secureCook
       }
       if (path.startsWith('/api/')) {
         if (!authenticated) return send(res,401,{error:{code:'unauthorized',message:'Owner sign-in required.'}});
+      if(req.method!=='GET' || req.url?.split('?')[0]==='/api/export') {
+        const previous=mutationTail;mutationTail=new Promise(resolve=>{releaseMutation=resolve;});await previous;
+      }
+
+        if(importing && req.method!=='GET') throw fail('conflict','Import in progress.');
         if (req.method === 'POST' && path === '/api/logout') { sessions.delete(token); res.setHeader('Set-Cookie',cookie('')); return send(res,200,{authenticated:false}); }
-        if (req.method === 'GET' && path === '/api/library') return send(res,200,store.library());
+        if (req.method === 'GET' && path === '/api/characters') {
+          const allowed=['q','category','tag','favorites','archived','gender','sort','offset','limit'];
+          if ([...url.searchParams.keys()].some(k=>!allowed.includes(k))) throw fail('invalid','Unknown filter.');
+          const query=Object.fromEntries(url.searchParams);
+          for(const k of ['offset','limit']) if(k in query) {if(!/^\d+$/.test(query[k])) throw fail('invalid','Invalid page.');query[k]=Number(query[k]);}
+          if('favorites' in query) {if(!['true','false'].includes(query.favorites)) throw fail('invalid','Invalid filter.');query.favorites=query.favorites==='true';}
+          return send(res,200,store.queryCharacters(query));
+        }
+        if (path === '/api/media' && req.method==='POST') {
+          if(!media) throw fail('invalid','Media storage unavailable.');
+          let size=0;const chunks=[];
+          for await(const chunk of req) {size+=chunk.length;if(size>MAX_UPLOAD_BYTES) throw fail('invalid','Image too large.');chunks.push(chunk);}
+          return send(res,201,{asset:await media.upload(Buffer.concat(chunks))});
+        }
+        const assetMatch=/^\/api\/media\/([a-zA-Z0-9-]+)(\/thumbnail)?$/.exec(path);
+        if(assetMatch && req.method==='DELETE' && !assetMatch[2]) {if(!media)throw fail('not_found','Media unavailable.');return send(res,200,await media.remove(assetMatch[1],collectMediaReferences(exportData(store,{includeHistory:true}))));}
+        if(assetMatch && req.method==='GET') {
+          if(!media) throw fail('not_found','Media unavailable.');
+          const asset=await media.get(assetMatch[1],{thumbnail:!!assetMatch[2]});
+          res.writeHead(200,{'Content-Type':asset.mime});return res.end(asset.bytes);
+        }
+        if (req.method === 'GET' && path === '/api/library') return send(res,200,store.library({summary:url.searchParams.get('summary')==='true'}));
         if (req.method === 'GET' && path === '/api/export') {
           if (active) throw fail('conflict','Wait for generation to finish before exporting.');
           res.setHeader('Content-Disposition','attachment; filename="storychat-export.json"');
-          return send(res,200,exportData(store));
+          return send(res,200,await exportBundle(exportData(store),media));
         }
         if (req.method === 'POST' && path === '/api/import') {
           if (active) throw fail('conflict','Wait for generation to finish before importing.');
-          return send(res,201,importData(store,await body(req,MAX_TRANSFER_BYTES)));
+          importing=true;
+          try {const value=await body(req,media?MAX_MEDIA_BACKUP_BYTES:MAX_TRANSFER_BYTES);validateTransfer(splitBundle(value).data);const staged=await stageBundle(value,media);try{return send(res,201,importData(store,staged.data));}catch(e){await staged.rollback();throw e;}} finally {importing=false;}
         }
         const definition = /^\/api\/(characters|personas)\/([a-zA-Z0-9-]+)(?:\/(duplicate))?$/.exec(path);
         if (definition) {
           const [,category,recordId,operation]=definition, type=category==='characters'?'character':'persona';
+          if(req.method==='GET' && !operation) return send(res,200,store.definition(recordId,type));
           if (req.method==='POST' && operation==='duplicate') return send(res,201,store.duplicateDefinition(type,recordId));
           if (req.method==='DELETE' && !operation) {store.deleteDefinition(type,recordId);return send(res,200,{deleted:true});}
           if (req.method==='PATCH' && !operation) {
-            const data=await body(req);
+            const data=await body(req,131072);
+            if(type==='character' && data.cover) {if(!media) throw fail('invalid','Media unavailable.');await media.metadata(data.cover);}
             return send(res,200,store.updateDefinition(type,recordId,data));
           }
           return send(res,405,{error:{code:'invalid',message:'Method not supported.'}});
         }
         const creates = {'/api/characters':'createCharacter','/api/personas':'createPersona','/api/stories':'createStory'};
-        if (req.method === 'POST' && creates[path]) return send(res,201,store[creates[path]](await body(req)));
+        if (req.method === 'POST' && creates[path]) {const data=await body(req,131072);if(path==='/api/characters' && data.cover){if(!media)throw fail('invalid','Media unavailable.');await media.metadata(data.cover);}return send(res,201,store[creates[path]](data));}
         const match = /^\/api\/stories\/([a-zA-Z0-9-]+)(?:\/(controls|turns|memories)(?:\/([a-zA-Z0-9-]+))?)?$/.exec(path);
         if (!match) return send(res,404,{error:{code:'not_found',message:'Route not found.'}});
         const [,id,action,memoryId]=match;
@@ -121,13 +154,14 @@ export function createApplication({store, provider, password, origin, secureCook
         }
         return send(res,405,{error:{code:'invalid',message:'Method not supported.'}});
       }
-      const files = {'/':'index.html','/index.html':'index.html','/app.js':'app.js','/style.css':'style.css','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest','/icon.svg':'icon.svg'};
+      const files = {'/':'index.html','/index.html':'index.html','/explorer.js':'explorer.js','/i18n.js':'i18n.js','/app.js':'app.js','/style.css':'style.css','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest','/icon.svg':'icon.svg'};
       if (req.method !== 'GET' || !files[path]) return send(res,404,{error:{code:'not_found',message:'Not found.'}});
       const extension=files[path].split('.').pop();
       const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json',svg:'image/svg+xml'};
       const bytes=await readFile(resolve(root,'public',files[path])); res.writeHead(200,{'Content-Type':types[extension]}); res.end(bytes);
-    } catch(error) { if (!res.headersSent) send(res,error.code === 'not_found' ? 404 : error.code === 'conflict' ? 409 : error.code === 'invalid' ? 400 : 500,{error:publicFailure(error)}); else res.end(); }
+    } catch(error) { if (!res.headersSent) send(res,error.code === 'not_found' ? 404 : error.code === 'conflict' ? 409 : error.code === 'invalid' ? 400 : 500,{error:publicFailure(error)}); else res.end(); } finally {releaseMutation?.();}
   });
+  server.requestTimeout=30000;
   return {server, close() {
     if (closing) return closing;
     stopping = true;
@@ -175,7 +209,8 @@ async function main() {
   try { provider=await createProvider({}); }
   catch(error) {provider={name:'chatgpt',model:process.env.STORYCHAT_MODEL || '',unavailable:error,generate:async()=>{throw error;}}; console.error(publicFailure(error).message);}
   store = new Store(db);
-  app=createApplication({store,provider,password,origin,secureCookies:!!origin?.startsWith('https:')});
+  const media=new MediaStore(process.env.STORYCHAT_MEDIA_DIR || resolve(dirname(db),'media'),{maxBytes:Number(process.env.STORYCHAT_MEDIA_MAX_BYTES || 268435456)});
+  app=createApplication({store,provider,password,origin,media,secureCookies:!!origin?.startsWith('https:')});
   await new Promise((resolveListen,rejectListen)=>{
     const failed=error=>rejectListen(error);
     app.server.once('error',failed);

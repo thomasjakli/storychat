@@ -89,3 +89,22 @@ Use this digest as `STORYCHAT_IMAGE` to pin the tested artifact. Follow the firs
 ## Milestone 3 features
 
 The owner reports successful deployed milestone 2 acceptance on Android Firefox. New library management, latest-turn editing/regeneration, portable export/import and offline lossless backup/restore are described in [milestone 3 verification](milestone-3-verification.md), [recovery](backup-restore.md) and [upgrade/device checks](milestone-3-upgrade.md). Existing historical turns without a rollback baseline cannot be regenerated; new turns support safe replacement. No automatic model retry or provider change is introduced.
+
+## Character covers and media recovery
+
+Cover processing uses pinned `sharp` 0.35.5. Run `npm ci --ignore-scripts --include=optional` with Node 24 before starting or testing from source. Matching native packages are installed by npm; no downloaded user artwork enters the build. The [sharp constructor](https://sharp.pixelplumbing.com/api-constructor/) documents decoder pixel limits; [output defaults](https://sharp.pixelplumbing.com/api-output/) omit original metadata. The application accepts JPEG, PNG and WebP signatures only, rejects animations, caps input at 8 MiB and 24 million pixels, orients and re-encodes images as WebP at up to 2048×2048, and produces separate thumbnails. Original image files and EXIF are not retained. Cover framing/focal points are presentation settings rather than destructive edits of the retained image.
+
+Set `STORYCHAT_MEDIA_DIR` to a dedicated private directory. Compose mounts the new named `media-data` volume at `/var/lib/storychat/media`; preserve it alongside `story-data`. The initial default media capacity is 256 MiB, including thumbnails. No external image URL is fetched. Binary reads must pass the same owner authentication as the application. Referenced covers cannot be deleted while another character or retained story snapshot needs them. Unreferenced uploads remain until explicitly deleted and count toward capacity.
+
+Media-aware backups use a versioned `storychat-media` JSON envelope containing the logical database export plus checksummed base64 WebP files and thumbnails. They contain private story content and pictures, so keep them outside Git. Credentials remain in the separate protected provider/key volumes and are excluded. Legacy text-only backups remain readable when they contain no cover references. JSON imports that refer to covers without including matching assets fail rather than create broken references. The application data portion retains its existing 8 MiB bound; the complete media envelope is bounded at 384 MiB. Because base64 and JSON need memory while processing, allow additional RAM during a large export/restore.
+
+Stop the application before using the offline backup CLI so the runtime lock can be acquired. Example operator commands inside a one-off container with the story/media volumes and a private backup directory mounted are:
+
+```sh
+STORYCHAT_MEDIA_DIR=/var/lib/storychat/media node app/backup.mjs backup /var/lib/storychat/stories/storychat.sqlite /backup/storychat-with-media.json
+STORYCHAT_MEDIA_DIR=/restore/media node app/backup.mjs restore /backup/storychat-with-media.json /restore/stories/storychat.sqlite
+```
+
+Restore into an isolated, empty destination first and verify character covers and stories using fake inference. Existing database destinations are never overwritten. Asset IDs, checksums and required references are validated; newly staged assets are removed on a failed import. The CLI requires the destination directory to be writable by UID/GID 1000 in the container. Copy the verified backup off the host, then recreate the original stack normally; do not remove named volumes.
+
+Before upgrading, retain the currently deployed immutable image reference and create a stopped-instance backup. Add the media volume when updating Compose. The first startup applies additive application-data changes. For rollback to a release predating these character/media fields, stop the upgraded application and restore the **pre-upgrade** backup to fresh story storage, then use the retained old image. Do not run an older binary against upgraded data. Preserve the new media volume separately until the upgrade is accepted; rolling back the image does not erase files or translate new exports into an old format.

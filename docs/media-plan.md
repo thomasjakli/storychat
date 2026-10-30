@@ -98,3 +98,6 @@ Recommended roles: Product/Architecture Planner maintains provider and scope dec
 4. Sound expectations: ambient effects/music versus authored dialogue, and whether the chosen provider supports them. Do not imply real-person voice cloning.
 
 This plan authorizes no implementation or provider activity by itself. The next implementation request should cover 4A only. Provider evaluation and stages 4B/4C remain shelved until the owner reopens them; they do not block uploaded character covers.
+
+
+Implementation update (2026-10-31): active local-character/cover/localization scope implemented with synthetic verification; see project.md for evidence and pending Android acceptance. Earlier proposals describe the design baseline, not proof of device acceptance. External retrieval, private character trial and generation remain deferred.

@@ -3,6 +3,15 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "engines": {"node": ">=24"},
-  "scripts": {"start": "node app/server.mjs", "test": "node app/test.mjs", "test:prototype": "node prototype/test.mjs"}
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node app/server.mjs",
+    "test": "node app/test.mjs",
+    "test:prototype": "node prototype/test.mjs"
+  },
+  "dependencies": {
+    "sharp": "0.35.5"
+  }
 }

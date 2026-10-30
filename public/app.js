@@ -11,16 +11,18 @@ function el(tag, className, text) {
   if (text !== undefined) node.textContent = String(text);
   return node;
 }
+function contentEl(tag,className,text){const node=el(tag,className,text);node.dataset.content='';return node;}
 function button(text, className, onClick) {
-  const node = el('button', className, text); node.type = 'button';
+  const node = el('button', className, t(text)); node.type = 'button';
   node.addEventListener('click', onClick); return node;
 }
 function showNotice(message, error = false) {
-  $('notice').textContent = message; $('notice').classList.toggle('error', error); $('notice').hidden = !message;
+  $('notice').textContent = t(message); $('notice').classList.toggle('error', error); $('notice').hidden = !message;
 }
 function view(name) {
   state.view = name;
-  for (const id of ['loading', 'login-view', 'library-view', 'story-view']) $(id).hidden = id !== name;
+  $('app-nav').hidden = !state.session?.authenticated;
+  for (const id of ['loading', 'login-view', 'library-view', 'story-view', 'characters-view', 'character-view', 'settings-view']) $(id).hidden = id !== name;
   $('page-footer').hidden = name === 'story-view';
 }
 async function api(path, options = {}) {
@@ -34,7 +36,8 @@ async function api(path, options = {}) {
   try { value = await response.json(); } catch { throw new Error('The server returned an unexpected response. Refresh once your connection is back.'); }
   if (!response.ok) {
     if (response.status === 401 && path !== '/api/login') lockView();
-    const error = new Error(value.error?.message || 'This action could not be completed.');
+    const errorMessages={sign_in_required:'Connect ChatGPT with the local onboarding helper on the server first',provider_unavailable:'Check the protected ChatGPT runtime and complete sign-in if needed',model_unavailable:'Select an available model from the authorized catalog in server configuration',subscription_sharing_usage_unavailable:'ChatGPT allowance or account access is currently unavailable',context_limit:'The context budget was reached; reduce unneeded story state before continuing',invalid:'Check the supplied fields and try again.',unauthorized:'Open the notebook to continue.',not_found:'This record is no longer available.',conflict:'This record changed. Refresh before trying again.',too_large:'This file is too large.',media_invalid:'This image format could not be read.',media_quota:'Media storage is full.'};
+    const error = new Error(t(errorMessages[value.error?.code] || 'This action could not be completed.'));
     error.code = value.error?.code; error.status = response.status; throw error;
   }
   if (epoch !== state.sessionEpoch) throw new Error('The notebook was locked. Open it again to continue.');
@@ -44,7 +47,7 @@ function stopPolling() { clearTimeout(state.poll); state.poll = null; }
 function lockView() {
   state.sessionEpoch += 1;
   stopPolling(); state.session = null; state.story = null; state.library = null; state.sendRequest = null;
-  $('messages').replaceChildren(); $('state-content').replaceChildren(); $('story-list').replaceChildren();
+  $('messages').replaceChildren(); $('state-content').replaceChildren(); $('story-list').replaceChildren();$('character-grid').replaceChildren();$('character-detail').replaceChildren();$('definition-form').reset();
   $('message').value = ''; $('password').value = ''; $('logout').hidden = true; $('provider-badge').hidden = true;
   closeInspector();
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
@@ -76,11 +79,12 @@ async function initialize() {
     $('provider-badge').title = fake ? 'Deterministic synthetic responses, not live AI.' : (state.session.model || 'Owner’s ChatGPT connection');
     showNotice(typeof state.session.providerError === 'string' ? state.session.providerError : state.session.providerError?.message || '');
     await loadLibrary();
+    if(typeof routeCurrentHash==='function')routeCurrentHash();
   } catch (error) { lockView(); showNotice(error.message, true); }
 }
 async function loadLibrary() {
   stopPolling(); closeInspector();
-  state.library = await api('/api/library'); state.story = null; state.lastSignature = '';
+  state.library = await api('/api/library?summary=true'); state.story = null; state.lastSignature = '';
   renderLibrary(); view('library-view');
 }
 function renderLibrary() {
@@ -95,7 +99,7 @@ function renderLibrary() {
     const characterName = story.character?.name || state.library.characters?.find(c => c.id === story.characterId)?.name || 'Your character';
     const card = button('', 'story-card', () => openStory(story.id).catch(error => showNotice(error.message, true)));
     const bottom = el('div', 'card-bottom'); bottom.append(el('span', '', 'Continue the story'), el('span', '', '↗'));
-    card.append(el('div', 'card-monogram', Array.from(characterName)[0]?.toUpperCase() || '✦'), el('h2', '', story.title || 'Untitled story'), el('p', '', 'With ' + characterName), bottom);
+    card.append(el('div', 'card-monogram', Array.from(characterName)[0]?.toUpperCase() || '✦'), contentEl('h2', '', story.title || t('Untitled story')), contentEl('p', '', (uiLocale==='de'?'Mit ':'With ') + characterName), bottom);
     $('story-list').append(card);
   }
 }
@@ -132,7 +136,7 @@ async function refreshStory() {
 function renderStory(force = false) {
   const story = state.story;
   $('story-title').textContent = story.title;
-  $('story-kicker').textContent = 'WITH ' + (story.character?.name || 'YOUR CHARACTER');
+  $('story-kicker').textContent = (uiLocale==='de'?'MIT ':'WITH ') + (story.character?.name || t('Your character'));
   const signature = JSON.stringify({ revision: story.revision, messages: story.messages, memories: story.memories, threads: story.threads, thoughts: story.thoughts, relationship: story.relationship, scene: story.scene, generations: story.generations });
   if (force || signature !== state.lastSignature) {
     const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 260;
@@ -148,15 +152,15 @@ function renderStory(force = false) {
   if (!$('controls-form').contains(document.activeElement) || force) {
     $('tone').value = controls.tone; $('detail').value = controls.detail; $('length').value = controls.length;
   }
-  $('control-summary').textContent = `${controls.tone} · ${controls.detail} · ${controls.length}`;
+  $('control-summary').textContent = [controls.tone,controls.detail,controls.length].map(value=>t(value[0].toUpperCase()+value.slice(1))).join(' · ');
   renderGeneration();
 }
 function renderMessages() {
   $('messages').replaceChildren();
   for (const message of (state.story.messages || []).filter(item => !item.superseded)) {
-    const article = el('article', 'message' + (message.role === 'user' ? ' user' : ''));
+    const article = el('article', 'message' + (message.role === 'user' ? ' user' : message.kind === 'intro' || message.type === 'intro' ? ' intro' : ''));
     article.id = 'message-' + message.id;
-    article.append(el('p', 'message-label', message.role === 'user' ? (state.story.persona?.name || 'You') : state.story.character?.name || 'Character'), el('div', 'message-text', message.text));
+    article.append(contentEl('p', 'message-label', message.kind === 'intro' || message.type === 'intro' ? t('Intro') : message.role === 'user' ? (state.story.persona?.name || t('You')) : state.story.character?.name || t('Character')), contentEl('div', 'message-text', message.text));
     $('messages').append(article);
   }
   if (!$('messages').children.length) $('messages').append(el('p', 'empty-state', 'The scene is yours to begin. Write the first moment below.'));
@@ -181,11 +185,11 @@ function renderGeneration() {
       interrupted: 'The server stopped before this reply completed'
     };
     const errorCode = typeof generation.error === 'string' ? generation.error : generation.error?.code || generation.code;
-    const safe = explanations[errorCode] || generation.error?.message || 'The reply could not be completed';
-    status.append(el('span', '', `Reply ${generation.status}: ${safe}. No incomplete memory changes were applied.`));
+    const safe = t(explanations[errorCode] || 'The reply could not be completed');
+    status.append(el('span', '', uiLocale==='de'?`Antwort ${t(generation.status)}: ${safe}. Es wurden keine unvollständigen Erinnerungen übernommen.`:`Reply ${generation.status}: ${safe}. No incomplete memory changes were applied.`));
     status.append(button('Use last message as draft', 'quiet', () => {
       const lastUser = [...state.story.messages].reverse().find(m => m.role === 'user');
-      if (lastUser && (!$('message').value || confirm('Replace your current draft with the previous message?'))) { $('message').value = lastUser.text; saveDraft(); $('message').focus(); }
+      if (lastUser && (!$('message').value || uiConfirm('Replace your current draft with the previous message?'))) { $('message').value = lastUser.text; saveDraft(); $('message').focus(); }
     }));
   } else if (state.sendRequest) {
     status.append(el('span', '', 'Your last send could not be confirmed. Your draft is preserved.'));
@@ -204,7 +208,7 @@ function sourceButtons(parent, sources) {
         const audit = state.story.messages?.find(item => item.id === source && item.superseded);
         if (audit) {
           const dialog = document.createElement('dialog'), content = el('section','create-form');
-          content.append(el('h2','','Earlier source'),el('p','hint','This message belongs to a replaced turn. It is retained as source evidence, not current story context.'),el('p','message-text',audit.text),button('Close','quiet',()=>dialog.close()));
+          content.append(el('h2','','Earlier source'),el('p','hint','This message belongs to a replaced turn. It is retained as source evidence, not current story context.'),contentEl('p','message-text',audit.text),button('Close','quiet',()=>dialog.close()));
           dialog.append(content);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
         } else showNotice('This source message is not available in the displayed transcript.', true);
         return;
@@ -220,9 +224,9 @@ function section(title, entries, emptyText, type) {
   for (const entry of entries || []) {
     const item = el('div', 'state-entry');
     const tags = [entry.kind, entry.pinned ? 'Pinned' : '', entry.corrected ? 'Owner corrected' : '', entry.conflict ? 'Conflict to reconcile' : ''].filter(Boolean);
-    if (tags.length) item.append(el('p', 'entry-meta', tags.join(' · ')));
+    if (tags.length) item.append(el('p', 'entry-meta', tags.map(t).join(' · ')));
     if (entry.status) item.append(el('span', 'status-tag', entry.status));
-    item.append(el('p', '', entry.text));
+    item.append(contentEl('p', '', entry.text));
     const actions = el('div', 'entry-actions'); sourceButtons(actions, entry.sources);
     if (type === 'memory') {
       actions.append(button(entry.pinned ? 'Unpin' : 'Pin', 'quiet', () => mutateMemory(entry.id, { pinned: !entry.pinned })), button('Correct', 'quiet', () => editMemory(entry)), button('Remove', 'quiet', () => removeMemory(entry)));
@@ -237,7 +241,7 @@ function renderState() {
   if (story.scene?.text) {
     const item = el('div', 'state-entry');
     if (story.scene.fictionalTime) item.append(el('p', 'entry-meta', 'Story time · ' + story.scene.fictionalTime));
-    item.append(el('p', '', story.scene.text)); const actions = el('div', 'entry-actions'); sourceButtons(actions, story.scene.sources); item.append(actions); scene.append(item);
+    item.append(contentEl('p', '', story.scene.text)); const actions = el('div', 'entry-actions'); sourceButtons(actions, story.scene.sources); item.append(actions); scene.append(item);
   } else scene.append(el('p', 'empty-state', 'The scene will take shape as you write.'));
   content.append(scene,
     section('Remembered', story.memories, 'Shared facts and moments will appear here. You can correct, pin, or remove them.', 'memory'),
@@ -254,7 +258,7 @@ function editMemory(entry) {
   $('memory-dialog').showModal(); $('memory-text').focus();
 }
 async function removeMemory(entry) {
-  if (!confirm('Remove this memory? Its source conversation stays in the story; automatic extraction will respect this removal.')) return;
+  if (!uiConfirm('Remove this memory? Its source conversation stays in the story; automatic extraction will respect this removal.')) return;
   try { state.story = await api(`/api/stories/${state.story.id}/memories/${entry.id}`, { method: 'DELETE' }); renderStory(); showNotice('Memory removed.'); }
   catch (error) { showNotice(error.message, true); }
 }
@@ -265,7 +269,7 @@ function closeInspector() {
 }
 function selectOptions(select, values) {
   select.replaceChildren(); const fresh = el('option', '', '+ Create new'); fresh.value = ''; select.append(fresh);
-  for (const item of (values || []).filter(value => !value.archived)) { const option = el('option', '', item.name); option.value = item.id; select.append(option); }
+  for (const item of (values || []).filter(value => !value.archived)) { const option = contentEl('option', '', item.name); option.value = item.id; select.append(option); }
 }
 function updateNewFields() {
   for (const kind of ['character', 'persona']) {
@@ -290,7 +294,7 @@ $('logout').addEventListener('click', async () => {
 $('back').addEventListener('click', () => { saveDraft(); loadLibrary().catch(error => showNotice(error.message, true)); });
 $('new-story').addEventListener('click', () => {
   $('create-form').reset(); $('create-error').hidden = true;
-  selectOptions($('character-choice'), state.library.characters); selectOptions($('persona-choice'), state.library.personas);
+  selectOptions($('character-choice'), state.library.characters.filter(c=>!c.draft)); selectOptions($('persona-choice'), state.library.personas);
   updateNewFields(); $('create-dialog').showModal();
 });
 for (const kind of ['character', 'persona']) $(kind + '-choice').addEventListener('change', updateNewFields);
@@ -352,7 +356,7 @@ $('memory-form').addEventListener('submit', async event => {
   finally { event.submitter.disabled = false; }
 });
 $('delete-story').addEventListener('click', async () => {
-  if (!confirm('Permanently delete this story, its conversation and all its memories? Your character and persona stay in your notebook.')) return;
+  if (!uiConfirm('Permanently delete this story, its conversation and all its memories? Your character and persona stay in your notebook.')) return;
   try {
     const id = state.story.id; await api(`/api/stories/${id}`, { method: 'DELETE' });
     try { localStorage.removeItem(draftPrefix + id); } catch { /* Storage may be unavailable. */ }
@@ -392,19 +396,20 @@ async function libraryAction(kind, record, action) {
     if (action === 'duplicate') await api(path + '/duplicate', {method:'POST',body:'{}'});
     else if (action === 'delete') await api(path, {method:'DELETE'});
     else await api(path, {method:'PATCH',body:JSON.stringify({archived:!record.archived})});
-    state.library = await api('/api/library'); renderDefinitions(); renderLibrary(); showNotice('Library updated.');
+    state.library = await api('/api/library?summary=true'); renderDefinitions(); renderLibrary(); showNotice('Library updated.');
   } catch(error) { showNotice(error.message,true); }
 }
 function renderDefinitions() {
   const list=$('definition-list'); list.replaceChildren();
   for (const [kind,title] of [['characters','Characters'],['personas','Personas']]) {
     const section=el('section','definition-section'); section.append(el('h3','',title));
-    for(const record of state.library[kind] || []) {
-      const row=el('article','definition-row'); row.append(el('h3','',record.name + (record.archived?' · Archived':'')),el('p','hint',`Version ${record.version || 1}`));
+    for(let record of state.library[kind] || []) {
+      const row=el('article','definition-row'); row.append(contentEl('h3','',record.name + (record.archived?' · '+t('Archived'):'')),el('p','hint',`Version ${record.version || 1}`));
       const actions=el('div','entry-actions');
-      actions.append(button('Edit','quiet',()=>{
+      actions.append(button('Edit','quiet',async()=>{
+        try{record=await api('/api/'+kind+'/'+encodeURIComponent(record.id));}catch(error){showNotice(error.message,true);return;}
         state.editingDefinition={kind,id:record.id}; $('definition-name').value=record.name; $('definition-text').value=record.definition;
-        $('definition-opening').value=record.opening||''; $('definition-opening-label').hidden=kind!=='characters'; $('definition-error').hidden=true; $('definition-dialog').showModal();
+        fillCharacterFields(record,kind); $('definition-opening').value=record.opening||''; $('definition-opening-label').hidden=kind!=='characters'; $('definition-error').hidden=true; $('definition-dialog').showModal();
       }),button('Duplicate','quiet',()=>libraryAction(kind,record,'duplicate')),button(record.archived?'Unarchive':'Archive','quiet',()=>libraryAction(kind,record,'archive')),button('Delete','danger',()=>libraryAction(kind,record,'delete')));
       row.append(actions);section.append(row);
     }
@@ -419,9 +424,9 @@ $('definition-form').addEventListener('submit',async event=>{
   event.preventDefault();event.submitter.disabled=true;
   try {
     const {kind,id}=state.editingDefinition, changes={name:$('definition-name').value.trim(),definition:$('definition-text').value.trim()};
-    if(kind==='characters')changes.opening=$('definition-opening').value.trim();
-    await api(`/api/${kind}/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(changes)});
-    state.library=await api('/api/library');renderDefinitions();$('definition-dialog').close();showNotice('Definition saved. Existing stories retain their snapshots.');
+    if(kind==='characters')Object.assign(changes, readCharacterFields(), {opening:$('definition-opening').value.trim()});
+    await api(`/api/${kind}${id ? '/' + encodeURIComponent(id) : ''}`,{method:id?'PATCH':'POST',body:JSON.stringify(changes)});
+    state.library=await api('/api/library?summary=true');renderDefinitions();$('definition-dialog').close();if(state.view==='characters-view'||state.view==='character-view')await loadCharacters();showNotice('Definition saved. Existing stories retain their snapshots.');
   }catch(error){$('definition-error').textContent=error.message;$('definition-error').hidden=false;}finally{event.submitter.disabled=false;}
 });
 function openReplacement(generation) {
@@ -436,7 +441,7 @@ async function replaceTurn(attempt) {
   finally{state.busy=false;renderGeneration();}
 }
 async function regenerate(generation) {
-  if(!confirm('Replace the latest reply and its derived state? This sends one new request using your ChatGPT allowance.'))return;
+  if(!uiConfirm('Replace the latest reply and its derived state? This sends one new request using your ChatGPT allowance.'))return;
   try{await replaceTurn({requestId:crypto.randomUUID(),generationId:generation.id,revision:state.story.revision});}catch{}
 }
 $('close-replace').addEventListener('click',()=>$('replace-dialog').close());
@@ -452,7 +457,7 @@ $('import-data').addEventListener('click',()=>$('import-file').click());
 $('import-file').addEventListener('change',async event=>{
   const file=event.target.files[0];event.target.value='';if(!file)return;
   if(file.size>8*1024*1024){showNotice('Import is too large (maximum 8 MiB).',true);return;}
-  if(!confirm('Import this notebook as additional records? The file may contain private story text. Existing records will remain.'))return;
+  if(!uiConfirm('Import this notebook as additional records? The file may contain private story text. Existing records will remain.'))return;
   try{const archive=JSON.parse(await file.text());await api('/api/import',{method:'POST',body:JSON.stringify(archive)});await loadLibrary();showNotice('Notebook imported. No model requests were sent.');}catch(error){showNotice(error.message,true);}
 });
 let installPrompt=null;

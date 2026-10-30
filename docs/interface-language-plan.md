@@ -30,3 +30,6 @@ Status: planned, 2026-10-30; no implementation yet. This accompanies character c
 7. Dictionary parity, dynamic errors and both-language owner journeys pass with synthetic/fake-provider data. No personal content or external translation service is used.
 
 Implementation should share interfaces with cover-upload work so newly introduced strings ship in both languages. Android Experience owns dictionaries/selector/rendering; Quality tests parity, storage failure and device isolation; the coordinator reviews any new server error codes. This plan does not authorize a deployment change.
+
+
+Implementation update (2026-10-31): active local-character/cover/localization scope implemented with synthetic verification; see project.md for evidence and pending Android acceptance. Earlier proposals describe the design baseline, not proof of device acceptance. External retrieval, private character trial and generation remain deferred.

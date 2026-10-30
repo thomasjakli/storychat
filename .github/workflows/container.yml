@@ -12,6 +12,7 @@ on:
       - '.dockerignore'
       - 'compose.yaml'
       - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/container.yml'
   pull_request:
     paths:
@@ -23,6 +24,7 @@ on:
       - '.dockerignore'
       - 'compose.yaml'
       - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/container.yml'
   workflow_dispatch:
 
@@ -47,6 +49,8 @@ jobs:
         with:
           node-version: '24.22.2'
           package-manager-cache: false
+      - name: Install locked image-processing dependency
+        run: npm ci --ignore-scripts
       - name: Synthetic application checks
         run: node app/test.mjs
       - name: Synthetic subscription-adapter checks

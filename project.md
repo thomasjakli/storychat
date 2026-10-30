@@ -1,7 +1,7 @@
 # Self-hosted Character Stories — Project Specification
 
 Status: Milestone 1 complete and pushed. Milestone 2 complete: automated continuity checks and owner-reported deployed ChatGPT/Android Firefox acceptance pass. Milestone 3 is complete by owner acceptance on 2026-10-30; remaining owner recovery testing is deferred and non-blocking. The Linux/amd64 container and encrypted same-owner credential handoff pass synthetic Linux CI and are published for first deployment. The owner reports successful personal-host ChatGPT connection, replies, Android Firefox checks, restart persistence and story isolation. This is owner-reported evidence, not agent-observed device testing. The owner reports fully passing milestone 3 manual checks 1–4; check 5 (export/recovery) was partially tested, with remaining checks explicitly deferred.
-Last reviewed: 2026-10-30.
+Last reviewed: 2026-10-31.
 
 Owner-selected update policy (2026-10-30): publish `ghcr.io/thomasjakli/storychat:latest` after successful verification and publish-candidate container tests. Keep full commit tags and immutable digests for rollback. The owner may use `latest` in Portainer and explicitly re-pull/recreate; publication does not automatically update the running stack.
 
@@ -344,3 +344,15 @@ The owner reports fully passing milestone 3 manual groups 1–4: library managem
 Corrected release commit `a96b01b0433a141bebe98157ae9b2374f60c4e76` passed 44 application and 62 provider/setup tests on Linux with no skips. Both verification/publication jobs passed actual-container isolated backup/restore and replacement checks. Details: [milestone 3 verification](docs/milestone-3-verification.md), [upgrade/rollback](docs/milestone-3-upgrade.md), [backup/restore](docs/backup-restore.md).
 
 Use the tested rolling `latest` tag for owner-triggered pull/recreation, or pin a recorded commit/digest. Retain a pre-upgrade backup and prior digest. Legacy turns lack replacement snapshots; portable exports omit regeneration history, while offline logical backups retain it. No automatic rollout, recurring model workload or reminder automation is configured.
+
+## Next-update implementation contracts (2026-10-31)
+
+Implementation in progress; this entry is not acceptance evidence. External catalogue investigation/import and generation stages 4B/4C are shelved. Implement local exploration, expanded characters, uploaded covers (4A) and English/German UI together. Use additive defaults and immutable story snapshots; separate owner preferences from versioned content. Adopt proposed field bounds from the exploration plan. Character summary API uses bounded offset pagination (24 default), deterministic sorting and full detail on demand. Media uses opaque IDs, private storage and validated raster decode/re-encode with thumbnails; no remote URL fetching. UI locale is browser-local and defaults to English. Existing provider authorization stays unchanged.
+
+File ownership: Story/Memory owns store/transfer and model tests; Security owns media/backup/container dependencies and recovery documentation; Android owns public UI; coordinating planner owns server integration, release documentation and integrated verification. Independent QA follows integration. Real-device acceptance remains pending owner verification.
+
+### Milestone 4A integrated implementation evidence (2026-10-31)
+
+Local character explorer/detail and separate stories/settings, versioned expanded character fields, draft/favorite preferences, bounded summary queries, safe typed intro/opening, uploaded covers and English/German browser-local interface are implemented. No external catalogue access/import or generation is included. Covers use private UUID storage, bounded JPEG/PNG/WebP sanitization, shared-reference protection and checksummed media-aware portable export and offline lossless backup. Legacy stories remain unchanged. Selector payloads omit full definitions and narratives; details are fetched on demand.
+
+Synthetic verification includes old-data migration, immutable snapshots, restart, Unicode search/pagination, owner authentication, media validation/shared references, concurrent mutation serialization, isolated online/offline restore, failed-import rollback, zero inference for library operations, localization parity, blocked storage and authored-text preservation. Windows skips Linux-only runtime checks; container CI supplies Linux evidence. Device acceptance is pending: Android Firefox explorer/back/scroll/keyboard, focal preview/upload, long intro/opening, language switching during draft/polling, and media export/restore. Desktop source/DOM tests do not establish real-device usability. No production upgrade performed. Stage 4A remains pending owner device acceptance; 4B/4C remain shelved.

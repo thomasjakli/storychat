@@ -28,13 +28,16 @@ services:
       STORYCHAT_MODEL: ${STORYCHAT_MODEL:-}
       STORYCHAT_DB: /var/lib/storychat/stories/storychat.sqlite
       STORYCHAT_DATA_DIR: /var/lib/storychat/provider
+      STORYCHAT_MEDIA_DIR: /var/lib/storychat/media
       STORYCHAT_KEY_DIR: /var/lib/storychat/keys
     volumes:
       - story-data:/var/lib/storychat/stories
       - provider-data:/var/lib/storychat/provider
       - provider-key:/var/lib/storychat/keys
+      - media-data:/var/lib/storychat/media
 
 volumes:
   story-data:
   provider-data:
   provider-key:
+  media-data:

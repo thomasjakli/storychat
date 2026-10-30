@@ -7,14 +7,16 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && command -v flock \
     && install -d -m 0700 -o 1000 -g 1000 \
-       /var/lib/storychat/stories /var/lib/storychat/provider /var/lib/storychat/keys
+       /var/lib/storychat/stories /var/lib/storychat/provider /var/lib/storychat/keys /var/lib/storychat/media
 
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --include=optional
 
 # Exact runtime sources only. Private files must never enter the build context.
-COPY app/server.mjs app/store.mjs app/provider.mjs app/transfer.mjs app/backup.mjs ./app/
+COPY app/server.mjs app/store.mjs app/provider.mjs app/transfer.mjs app/backup.mjs app/media.mjs app/media-transfer.mjs ./app/
 COPY prototype/auth.mjs prototype/cli.mjs prototype/connection.mjs prototype/errors.mjs prototype/handoff.mjs prototype/output.mjs prototype/provider.mjs prototype/runtime-lock.mjs prototype/stream.mjs prototype/vault.mjs ./prototype/
-COPY public/index.html public/style.css public/app.js public/icon.svg public/manifest.webmanifest ./public/
+COPY public/index.html public/style.css public/app.js public/explorer.js public/i18n.js public/icon.svg public/manifest.webmanifest ./public/
 COPY deploy/healthcheck.mjs deploy/connect-chatgpt.sh ./deploy/
 
 ENV NODE_ENV=production \
@@ -22,7 +24,8 @@ ENV NODE_ENV=production \
     PORT=8787 \
     STORYCHAT_DB=/var/lib/storychat/stories/storychat.sqlite \
     STORYCHAT_DATA_DIR=/var/lib/storychat/provider \
-    STORYCHAT_KEY_DIR=/var/lib/storychat/keys
+    STORYCHAT_KEY_DIR=/var/lib/storychat/keys \
+    STORYCHAT_MEDIA_DIR=/var/lib/storychat/media
 
 USER 1000:1000
 EXPOSE 8787

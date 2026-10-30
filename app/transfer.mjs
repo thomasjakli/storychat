@@ -1,3 +1,4 @@
+import {characterFields,validateCharacterFields} from './store.mjs';
 // Logical application backups never contain provider configuration or credentials.
 export const MAX_TRANSFER_BYTES = 8 * 1024 * 1024;
 const invalid = () => { throw Object.assign(new Error('Invalid or unsupported story backup.'), {code:'invalid'}); };
@@ -5,13 +6,14 @@ const check = value => { if (!value) invalid(); };
 function object(value, keys, required = keys) { check(value && typeof value === 'object' && !Array.isArray(value)); check(Object.keys(value).every(k=>keys.includes(k)) && required.every(k=>Object.hasOwn(value,k))); }
 const text = (v,max=2000) => check(typeof v==='string' && v.length<=max);
 const identifier = v => check(typeof v==='string' && /^[a-zA-Z0-9._:-]{1,100}$/.test(v));
-function definition(v,type) { object(v,['id','name','definition','version','createdAt','updatedAt','archived','opening'],['id','name','definition','version','createdAt']); identifier(v.id);text(v.name,100);text(v.definition,8000);check(Number.isSafeInteger(v.version)&&v.version>0);text(v.createdAt,100);if(v.updatedAt!==undefined)text(v.updatedAt,100);if(v.archived!==undefined)check(typeof v.archived==='boolean');if(v.opening!==undefined){check(type==='character');text(v.opening,4000);} }
+function definition(v,type) { object(v,['id','name','definition','version','createdAt','updatedAt','archived',...(type==='character'?[...characterFields,'draft','favorite']:[])],['id','name','definition','version','createdAt']);identifier(v.id);text(v.name,100);text(v.definition,8000);check(Number.isSafeInteger(v.version)&&v.version>0);text(v.createdAt,100);if(v.updatedAt!==undefined)text(v.updatedAt,100);for(const key of ['archived','favorite','draft'])if(v[key]!==undefined)check(typeof v[key]==='boolean');if(type==='character')validateCharacterFields(v); }
+
 function story(v) {
   object(v,['id','title','character','persona','controls','revision','scene','messages','memories','threads','relationship','thoughts','summary','generations','suppression']);
   identifier(v.id);text(v.title,120);definition(v.character,'character');definition(v.persona,'persona');
   object(v.controls,['tone','detail','length']);text(v.controls.tone,100);check(['minimal','balanced','rich'].includes(v.controls.detail)&&['short','medium','long'].includes(v.controls.length));check(Number.isSafeInteger(v.revision)&&v.revision>=0);text(v.summary,12000);
   check(Array.isArray(v.messages)&&v.messages.length<=20000);const ids=new Set();
-  for(const m of v.messages){object(m,['id','role','text','createdAt','generationId','superseded'],['id','role','text','createdAt']);identifier(m.id);check(!ids.has(m.id));ids.add(m.id);check(['user','assistant'].includes(m.role));text(m.text,12000);text(m.createdAt,100);if(m.generationId!==undefined)identifier(m.generationId);if(m.superseded!==undefined)check(typeof m.superseded==='boolean');}
+  for(const m of v.messages){object(m,['id','role','text','createdAt','generationId','superseded','kind'],['id','role','text','createdAt']);identifier(m.id);check(!ids.has(m.id));ids.add(m.id);check(['user','assistant'].includes(m.role));text(m.text,12000);text(m.createdAt,100);if(m.kind!==undefined)check(['intro','opening'].includes(m.kind)&&m.role==='assistant');if(m.generationId!==undefined)identifier(m.generationId);if(m.superseded!==undefined)check(typeof m.superseded==='boolean');}
   for(const category of ['memories','threads','relationship','thoughts']){check(Array.isArray(v[category])&&v[category].length<=200);for(const r of v[category]){object(r,['id','key','text','sources','revision',...(category==='memories'?['kind','pinned','corrected','conflict','ownerRevision']:category==='threads'?['status']:[])],['id','key','text','sources','revision']);identifier(r.id);text(r.key,120);text(r.text);check(Number.isSafeInteger(r.revision)&&r.revision>=0);check(Array.isArray(r.sources)&&r.sources.length>0&&r.sources.length<=16&&r.sources.every(s=>ids.has(s)));if(r.ownerRevision!==undefined)check(Number.isSafeInteger(r.ownerRevision)&&r.ownerRevision>=0&&r.ownerRevision<=v.revision);if(category==='memories'){check(['fact','belief','event'].includes(r.kind));for(const k of ['pinned','corrected','conflict'])if(r[k]!==undefined)check(typeof r[k]==='boolean');}if(category==='threads')check(['pending','completed','cancelled','superseded'].includes(r.status));}}
   if(v.scene!==null){object(v.scene,['text','fictionalTime','sources','revision']);text(v.scene.text);text(v.scene.fictionalTime,200);check(Number.isSafeInteger(v.scene.revision));check(Array.isArray(v.scene.sources)&&v.scene.sources.length<=16&&v.scene.sources.every(s=>ids.has(s)));}
   check(Array.isArray(v.suppression)&&v.suppression.length<=20000);for(const s of v.suppression){object(s,['key','text','reason']);text(s.key,120);text(s.text);check(['correction','deletion'].includes(s.reason));}
@@ -26,7 +28,7 @@ function story(v) {
       object(g.context,['character','persona','controls','revision','scene','memories','threads','relationship','thoughts','summary','messages','suppression','instructions','sourceIds']);
       text(g.context.instructions,4000);check(Array.isArray(g.context.sourceIds)&&g.context.sourceIds.length<=5000&&g.context.sourceIds.every(s=>ids.has(s)));
       const {instructions,sourceIds,...contextState}=g.context; story({...v,...contextState,id:v.id,title:v.title,messages:v.messages,generations:[]});
-      check(Array.isArray(g.context.messages)&&g.context.messages.length<=6&&g.context.messages.every(m=>ids.has(m.id))); for(const m of g.context.messages){const retained=v.messages.find(x=>x.id===m.id);check(retained&&['role','text','createdAt','generationId'].every(k=>retained[k]===m[k]));object(m,['id','role','text','createdAt','generationId','superseded'],['id','role','text','createdAt']);text(m.text,12000);check(['user','assistant'].includes(m.role));text(m.createdAt,100);if(m.generationId!==undefined)identifier(m.generationId);if(m.superseded!==undefined)check(typeof m.superseded==='boolean');}
+      check(Array.isArray(g.context.messages)&&g.context.messages.length<=6&&g.context.messages.every(m=>ids.has(m.id))); for(const m of g.context.messages){const retained=v.messages.find(x=>x.id===m.id);check(retained&&['role','text','createdAt','generationId'].every(k=>retained[k]===m[k]));object(m,['id','role','text','createdAt','generationId','superseded','kind'],['id','role','text','createdAt']);text(m.text,12000);check(['user','assistant'].includes(m.role));text(m.createdAt,100);if(m.kind!==undefined)check(['intro','opening'].includes(m.kind)&&m.role==='assistant');if(m.generationId!==undefined)identifier(m.generationId);if(m.superseded!==undefined)check(typeof m.superseded==='boolean');}
     }
   }
 }
@@ -37,7 +39,7 @@ export function validateTransfer(value) {
 }
 export function exportData(store, {includeHistory=false} = {}) {
   return store.transaction(()=>{
-    const library=store.db.prepare('SELECT type,data FROM library').all().map(r=>({type:r.type,data:JSON.parse(r.data)}));
+    const library=store.db.prepare('SELECT type,data FROM library').all().map(r=>({type:r.type,data:r.type==='character'?store.definition(JSON.parse(r.data).id,'character'):JSON.parse(r.data)}));
     const stories=store.db.prepare('SELECT data FROM stories').all().map(r=>{const s=JSON.parse(r.data);if(s.generations.some(g=>g.status==='pending'))throw Object.assign(new Error('Wait for the active reply before exporting.'),{code:'conflict'});if(!includeHistory)s.generations=[];return s;});
     return validateTransfer({format:'storychat',version:1,library,stories});
   });
@@ -47,7 +49,7 @@ export function importData(store,input) {
   return store.transaction(()=>{
     for(const e of data.library)if(store.db.prepare('SELECT id FROM library WHERE id=?').get(e.data.id))throw Object.assign(new Error('Backup conflicts with existing library records. Restore into an empty instance.'),{code:'conflict'});
     for(const s of data.stories)if(store.db.prepare('SELECT id FROM stories WHERE id=?').get(s.id))throw Object.assign(new Error('Backup conflicts with existing stories. Restore into an empty instance.'),{code:'conflict'});
-    for(const e of data.library)store.db.prepare('INSERT INTO library(id,type,data) VALUES(?,?,?)').run(e.data.id,e.type,JSON.stringify(e.data));for(const s of data.stories)store.save(s);
+    for(const e of data.library){const record=structuredClone(e.data);if(e.type==='character'){const prefs={favorite:record.favorite??false,draft:record.draft??false,archived:record.archived??false};for(const key of ['favorite','draft','archived'])delete record[key];store.db.prepare('INSERT INTO character_preferences(id,data) VALUES(?,?)').run(record.id,JSON.stringify(prefs));}store.db.prepare('INSERT INTO library(id,type,data) VALUES(?,?,?)').run(record.id,e.type,JSON.stringify(record));}for(const s of data.stories)store.save(s);
     return {characters:data.library.filter(e=>e.type==='character').length,personas:data.library.filter(e=>e.type==='persona').length,stories:data.stories.length};
   });
 }
