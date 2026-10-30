@@ -15,7 +15,7 @@ node app/server.mjs
 
 Open `http://127.0.0.1:8787` on the same computer and enter that app password. Create an original adult character, fictional persona and story. The explicitly labelled fake provider demonstrates favorite-color statements, map promises/delivery, and gratitude; it is a limited deterministic example, not general AI. It makes no network or subscription requests.
 
-Create a character/persona once and reuse them in another story to check isolation. A new story snapshots their definitions. Library editing, portrait uploads, regeneration and export/import are later MVP work. Memory removal leaves source messages intact; story deletion removes that story's logical records and memories while retaining its library definitions. Deleted data may remain in SQLite pages/backups until operational compaction; secure erasure is not claimed.
+Create a character/persona once and reuse them in another story to check isolation. A new story snapshots their definitions. Library editing, latest-turn regeneration and export/import are implemented. Portrait uploads remain deferred. Memory removal leaves source messages intact; story deletion removes that story's logical records and memories while retaining its library definitions. Deleted data may remain in SQLite pages/backups until operational compaction; secure erasure is not claimed.
 
 Stop with Ctrl+C. Clear the password from the shell when finished:
 
@@ -69,13 +69,13 @@ The optional live evaluation is **never** included in `test`. With an authorized
 
 The current local preview URL works only on the Windows PC. A phone's loopback address points to the phone. Real Android acceptance needs an existing reachable trusted HTTPS route chosen by the owner; none was configured by this work. For that later route, set `STORYCHAT_HOST` to the intended private binding and `STORYCHAT_ORIGIN` to its exact HTTPS origin. The cookie becomes Secure, Host/Origin checks use that configured origin, and the proxy must preserve the original Host. Do not expose the OAuth callback, vault, or database through the tunnel. Do not replace Access policy checks with arbitrary incoming identity headers.
 
-On the actual Android device, verify owner login; creating character/persona/story; entering a fact and promise; reading the reply; opening source links; correction, pinning and removal; saving all three writing controls; closing/reopening the browser; and resuming after server restart. Record browser/device and results. Home-screen installation, virtual keyboard/background/stream recovery and actual Docker/Tunnel checks remain milestone 3. No service worker caches private data; the manifest and original SVG are groundwork, not proof of Android installability.
+On the actual Android device, verify owner login; creating character/persona/story; entering a fact and promise; reading the reply; opening source links; correction, pinning and removal; saving all three writing controls; closing/reopening the browser; and resuming after server restart. Record browser/device and results. The owner reports passing milestone 3 manual device groups 1–4, including installation/usability and background/restart checks. Remaining manual recovery testing is deferred. No service worker caches private data; the manifest and original SVG are groundwork, not proof of Android installability.
 
 No Docker host, tunnel, DNS, public service, paid fallback or recurring model workload is provisioned by this prototype.
 
 ## Container preparation
 
-See [container packaging](../deploy/README.md) and the [first-deployment guide](first-deployment.md) for the Compose stack, Portainer settings, encrypted credential handoff and activation. The public template contains no instance network topology or credentials. GitHub workflow verification and image publication are separate from deploying that image to the owner's host. Actual-owner handoff and real Android acceptance remain separate steps.
+See [container packaging](../deploy/README.md) and the [first-deployment guide](first-deployment.md) for the Compose stack, Portainer settings, encrypted credential handoff and activation. The public template contains no instance network topology or credentials. GitHub workflow verification and image publication are separate from deploying that image to the owner's host. The owner reports successful ChatGPT connection and Android acceptance; first-deployment instructions remain available for future installations.
 
 The verified handoff release is publicly retrievable using either its source-commit tag or digest:
 

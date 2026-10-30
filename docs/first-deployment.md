@@ -2,7 +2,7 @@
 
 This guide prepares one owner-only Linux/amd64 Docker instance managed by Portainer. Commands use a generic SSH alias, `storychat-host`, and example origin, `https://stories.example.com`; substitute your own values privately. Nothing here provisions ingress, changes DNS, publishes a service or enables a separately billed provider.
 
-Container packaging and synthetic Linux checks have passed CI. A real owner's first-host transfer, HTTPS route, owner-only edge policy and Android acceptance still need verification on the intended installation. An encrypted handoff test is evidence for the mechanism, not proof of a live subscription session on your host.
+Container packaging and synthetic Linux checks have passed CI. The owner reports deployed ChatGPT and Android acceptance complete. This guide remains the procedure for a new installation; a new host must verify its own authorization, access policy and device behavior. Remaining manual recovery checks on the existing installation are deferred.
 
 ## Recommended: SSH-assisted connection
 

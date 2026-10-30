@@ -1,5 +1,6 @@
 # Milestone 1 status
 
+Historical milestone evidence: statements about pending deployment/device work below describe that stage. All three milestones are now complete; current acceptance and deferred recovery checks are recorded in project.md and docs/milestone-3-verification.md.
 Date: 2026-10-30. Coordinator: Product and Architecture Planner.
 
 **Outcome: milestone 1 complete for personal, single-user provider feasibility.** The latest owner clarification removes family/multi-user access. One ChatGPT connection serves only the owner. Sign-in, catalog discovery, one real structured reply, renewal, revocation, and 48 offline tests passed. ChatGPT is the selected provider. The prototype is not the Android application or a deployed server.

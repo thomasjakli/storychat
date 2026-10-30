@@ -1,5 +1,6 @@
 # Milestone 2 verification
 
+Historical milestone evidence: statements about pending deployment/device work below describe that stage. All three milestones are now complete; current acceptance and deferred recovery checks are recorded in project.md and docs/milestone-3-verification.md.
 Reviewed 2026-10-30 by the Quality and Continuity Tester role.
 
 ## Scope
@@ -62,4 +63,4 @@ A final real server startup with the fake provider passed health, owner login/lo
 
 ## Owner-reported acceptance — 2026-10-30
 
-The owner reports the deployed app working on PC and Android Firefox, connected ChatGPT replies and successful completion of the requested continuity, memory editing, writing controls, reopen/restart persistence, story isolation, phone usability and logout checks. Milestone 2 is complete on that basis. These checks were reported by the owner; agents did not observe the device. New milestone 3 device/installation checks remain pending.
+The owner reports the deployed app working on PC and Android Firefox, connected ChatGPT replies and successful completion of the requested continuity, memory editing, writing controls, reopen/restart persistence, story isolation, phone usability and logout checks. Milestone 2 is complete on that basis. These checks were reported by the owner; agents did not observe the device. Milestone 3 device/installation groups were subsequently reported passed; only remaining manual recovery checks were deferred.
