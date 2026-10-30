@@ -43,3 +43,7 @@ On Android Firefox and any installation browser you use, verify:
 5. Export a synthetic notebook; test import into an isolated fake instance. Duplicate IDs must be refused without partial imports.
 
 Each explicit edit/regeneration sends one new request using your ChatGPT allowance. Replies remain withheld until structured output and state validate; incremental visible narrative streaming is not implemented. No automatic retry or paid fallback is introduced.
+
+## Rolling latest tag
+
+You may instead set STORYCHAT_IMAGE to ghcr.io/thomasjakli/storychat:latest. The workflow updates this tag only after verification and candidate container checks pass. To upgrade, explicitly re-pull the image and redeploy/recreate the container in Portainer; restarting an existing container alone does not change its image. Keep the previous running image digest and backup for rollback. No automatic deployment is configured.
