@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#191c1c">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="A private place for characters, conversations, and stories that remember.">
+  <title>Storychat · Your story continues</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="masthead">
+    <a class="brand" href="/" aria-label="Storychat home"><span class="brand-symbol" aria-hidden="true">✦</span> storychat<span class="brand-dot">.</span></a>
+    <div class="masthead-actions"><span id="provider-badge" class="badge" hidden></span><button id="logout" class="quiet" hidden>Lock app</button></div>
+  </header>
+  <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+  <main id="main">
+    <section id="loading" class="gate"><p class="eyebrow">YOUR PRIVATE STORY SPACE</p><h1>Opening your notebook…</h1></section>
+    <section id="login-view" class="gate" hidden>
+      <div class="gate-art" aria-hidden="true"><span>✦</span><i></i><i></i></div>
+      <p class="eyebrow">A LITTLE SPACE FOR OTHER WORLDS</p>
+      <h1>Some stories<br>stay with you.</h1>
+      <p class="lede">Return to familiar characters, unfinished promises, and a world that remembers.</p>
+      <form id="login-form" class="login-form">
+        <label for="password">Owner password</label>
+        <div class="login-row"><input id="password" type="password" autocomplete="current-password" required maxlength="256"><button class="primary" type="submit">Open notebook <span aria-hidden="true">↗</span></button></div>
+        <p class="hint">Your app password is separate from your ChatGPT connection.</p>
+      </form>
+    </section>
+    <section id="library-view" class="library" hidden>
+      <div class="section-heading"><div><p class="eyebrow">YOUR NOTEBOOK</p><h1>A world to return to.</h1><p class="subtle">Every story has a memory of its own.</p></div><button id="new-story" class="primary">+ Begin a story</button></div>
+      <div id="story-list" class="story-grid"></div>
+      <section class="library-foot"><span aria-hidden="true">✧</span><p>Your characters can cross into new stories.<br>Their memories stay with the story where they began.</p></section>
+    </section>
+    <section id="story-view" class="story-view" hidden>
+      <header class="story-heading"><button id="back" class="quiet">← Notebook</button><div class="story-title"><p id="story-kicker" class="eyebrow"></p><h1 id="story-title"></h1></div><button id="inspect-toggle" class="quiet inspect-button" aria-expanded="false" aria-controls="state-panel">Story memory <span aria-hidden="true">✧</span></button></header>
+      <div class="story-layout">
+        <section class="conversation" aria-label="Conversation">
+          <details class="writing-controls"><summary>Writing preferences <span id="control-summary"></span></summary><form id="controls-form"><label>Tone<select id="tone"><option>Natural</option><option>Warm</option><option>Playful</option><option>Serious</option><option>Romantic</option></select></label><label>Narrative detail<select id="detail"><option value="minimal">Minimal</option><option value="balanced">Balanced</option><option value="rich">Rich</option></select></label><label>Response length<select id="length"><option value="short">Short</option><option value="medium">Medium</option><option value="long">Long</option></select></label><button type="submit" class="quiet">Save preferences</button><p class="hint">Changes guide the writing. Your model and story memories stay the same.</p></form></details>
+          <div id="messages" class="messages" aria-label="Story messages"></div>
+          <div id="generation-status" class="generation-status" role="status" aria-live="polite"></div>
+          <button id="jump-latest" class="quiet jump-latest" hidden>↓ Latest message</button>
+          <form id="composer" class="composer"><label class="sr-only" for="message">Your reply</label><textarea id="message" rows="2" placeholder="What happens next?" maxlength="8000" required></textarea><div class="composer-footer"><span id="draft-status" class="hint">Your words move the story.</span><button id="send" class="primary" type="submit">Send <span aria-hidden="true">↑</span></button></div></form>
+          <p class="conversation-note">Fictional characters · Personal stories · Memories you can edit</p>
+        </section>
+        <aside id="state-panel" class="state-panel" aria-label="Story memory"><div class="state-heading"><div><p class="eyebrow">BETWEEN THE LINES</p><h2>What stays.</h2></div><button id="inspect-close" class="quiet" aria-label="Close story memory">✕</button></div><div id="state-content"></div><button id="delete-story" class="danger">Delete this story</button></aside>
+      </div>
+    </section>
+  </main>
+  <dialog id="create-dialog"><form id="create-form" class="create-form"><header class="dialog-heading"><div><p class="eyebrow">THE FIRST PAGE</p><h2>Begin a story.</h2></div><button type="button" id="close-create" class="quiet" aria-label="Close new story">✕</button></header><p class="subtle">Choose your characters, set the scene, and see where it goes.</p><label>Story title<input name="title" required maxlength="120" placeholder="A light in the window"></label><fieldset><legend>Who will you meet?</legend><label>Character<select id="character-choice" name="characterId"></select></label><div id="new-character-fields"><label>Name<input name="characterName" maxlength="100" placeholder="A fictional character"></label><label>Character definition<textarea name="characterDefinition" rows="4" maxlength="8000" placeholder="Adult age, personality, background, speaking style, motivations, and boundaries…"></textarea></label><label>Opening scene<textarea name="opening" rows="3" maxlength="4000" placeholder="Where does this story begin? What does the character say?"></textarea></label></div></fieldset><fieldset><legend>Who are you in this story?</legend><label>Persona<select id="persona-choice" name="personaId"></select></label><div id="new-persona-fields"><label>Persona name<input name="personaName" maxlength="100" placeholder="Your fictional name"></label><label>Persona details<textarea name="personaDefinition" rows="3" maxlength="8000" placeholder="Pronouns, background, and the story facts your character should know…"></textarea></label></div></fieldset><p id="create-error" class="form-error" role="alert" hidden></p><button type="submit" class="primary">Turn the first page <span aria-hidden="true">↗</span></button></form></dialog>
+  <dialog id="memory-dialog"><form id="memory-form" class="create-form"><header class="dialog-heading"><div><p class="eyebrow">YOUR STORY, YOUR SAY</p><h2>Correct a memory.</h2></div><button id="close-memory" type="button" class="quiet" aria-label="Close memory editor">✕</button></header><label>What should the character remember?<textarea id="memory-text" rows="6" required maxlength="2000"></textarea></label><p class="hint">Your correction takes priority over automatic extraction.</p><p id="memory-error" class="form-error" role="alert" hidden></p><button class="primary" type="submit">Save correction</button></form></dialog>
+  <footer id="page-footer" class="page-footer">A private place for stories that remember.</footer>
+</body>
+</html>

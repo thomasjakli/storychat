@@ -1,6 +1,6 @@
 # Self-hosted Character Stories — Project Specification
 
-Status: Milestone 1 complete for personal, single-user ChatGPT provider feasibility. Local sign-in, inference, renewal, revocation, and offline checks passed. Android application development and personal Docker deployment remain ahead.
+Status: Milestone 1 complete and pushed. Milestone 2 implementation, 27 automated checks, and a bounded live continuity evaluation pass; real Android acceptance remains pending a device-accessible route. Personal Docker deployment remains ahead.
 Last reviewed: 2026-10-30.
 
 This document describes the intended product and acceptance criteria. **Confirmed** requirements come from the owner. **Proposed** choices remain implementation recommendations. **Unverified** integration assumptions need a live test. Documentation notes are dated research, not proof of account access.
@@ -37,7 +37,7 @@ Only one owner-managed ChatGPT connection is active per instance. Keep credentia
 
 Use a deterministic fake provider for ordinary development and automated tests. Label sample responses and demonstrations clearly. A fake-provider demonstration does not establish subscription eligibility or live-model quality.
 
-Select the frontend framework, backend runtime, and database after the initial integration spike. SQLite is a candidate for a single server with modest writes; PostgreSQL is an alternative if concurrency or deployment needs justify it. A vector database, separate job service, and distributed deployment are not prerequisites.
+Implementation choice for milestone 2: Node 24 with built-in SQLite, a small HTTP server, and buildless HTML/CSS/JavaScript. SQLite transactions persist story aggregates; no external database, frontend framework, dependencies, vector service, or job service is needed for this prototype. The tested runtime is Node 24.22.1; Node 18 on the development PC is insufficient. [Node SQLite reference](https://nodejs.org/docs/latest-v24.x/api/sqlite.html).
 
 ### Android experience
 
@@ -245,6 +245,16 @@ The owner completed browser consent. Eight models were discovered; a single `gpt
 - Demonstrate inspectable inner thoughts and relationship development grounded in events.
 - Persist independent tone/detail/length controls without resetting state or changing the provider/model.
 
+Implementation update, 2026-10-30: `app/` and `public/` implement a sole-owner password/session-protected browser prototype, persistent character/persona snapshots and separate stories, strict source-linked facts/beliefs/events, pending/completed threads, relationships, authored thoughts, fictional scenes, corrections, pins, deletion suppression, and independent writing controls. Source links navigate to the retained transcript. Failed or interrupted generations apply no model state; stale completions are rejected. An instance serializes generation and holds the ChatGPT vault lock. ChatGPT is the default provider; fake mode must be explicitly selected and is labelled. No paid fallback exists.
+
+Verification: 27 automated checks pass, including independent scenarios with a separate Node process, SQLite restart/recall outside the six-message recent window, correction/deletion, conflict reconciliation, isolation, authentication and atomic failure recovery. The milestone 1 regression suite remains 48/48 passing. Desktop in-app browser checks passed login, original character/persona/story creation, chat, source navigation, correction, pinning, and independently saved controls at the available narrow viewport; these are not Android-device results.
+
+Live evaluation: the first request passed schema validation but left an authored thought only in the reply. The prompt was corrected; a subsequent four-request `gpt-6.1-sol` evaluation passed sourced state extraction, recall after database reopen and seven deterministic filler turns, corrected pinned preference, deletion suppression, explicit promise completion and fictional-time advancement. Five live requests total, no automatic retries or billed fallback. This is one synthetic scenario, not general semantic reliability. [Verification details](docs/milestone-2-verification.md), [running instructions](docs/running.md), [interface contract](docs/milestone-2-contract.md).
+
+**Milestone 2 remains pending real Android acceptance.** On 2026-10-30 the owner explicitly chose to defer the device check and record the milestone as pending. The preview binds to Windows loopback. No existing device-accessible HTTPS route has been selected, and no infrastructure was changed. Actual Android creation/chat/memory checks require the owner's route/device participation. M3 deployment, installation, keyboard/background testing, backup/restore, library editing and regeneration are not claimed.
+
+Prototype limits: recent context is six messages, selected memories plus state/summary have a fixed character budget, and each story is capped at 200 memories, 200 threads, 100 relationship and 100 thought entries, 20,000 messages and 10,000 attempts. Suppression matches normalized stable keys and text; semantic paraphrases using new keys are not reliably detected. Source validation proves permitted provenance IDs, not semantic truth. Final visible replies are withheld until complete JSON and state validation; incremental narrative streaming remains later work. Retained transcripts are distinct from memory removal; database file compaction/secure erasure is not implemented.
+
 ### Milestone 3: Personal MVP and deployment
 
 - Deliver character/persona management, private library access, and owner authentication.
@@ -281,10 +291,10 @@ The source repository is `thomasjakli/storychat`. Final application identity and
 - Initial local or VPS host, OS/CPU architecture, storage paths, and backup destination.
 - Application hostname, tunnel connector, Access policy, and app login method.
 - Personal Docker host and secure same-owner session-handoff implementation; ChatGPT is the selected provider.
-- Owner login method and instance concurrency/context limits. Multi-user access is outside the current scope.
+- Prototype owner login uses a configured password, scrypt verification, in-memory eight-hour HttpOnly/SameSite sessions, origin checks and login throttling. Remote binding requires a configured HTTPS origin; production/proxy review remains milestone 3. Prototype generation concurrency is one and context has a 120,000-character ceiling. Multi-user access is outside the scope.
 - Acceptance of PWA delivery for the first release.
 - Interface language and original initial character/story; support German story text without deriving a UI-language requirement from private examples.
-- Framework/runtime/database choice after feasibility work.
+- Reassess the selected dependency-free Node 24/SQLite/buildless stack only if a concrete limitation warrants it.
 - Default writing-control options and settings.
 - Final app identity and source license; the public repository already exists, but no license has been selected.
 

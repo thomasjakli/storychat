@@ -1,0 +1,72 @@
+# Running the continuity prototype
+
+Use **Node 24** (tested 24.22.1). No dependency installation or build is required. Run from the repository root. The system Node 18 installation on the development PC does not work; its bundled Node 24 executable is available through the desktop runtime. Standard commands below assume `node` resolves to Node 24.
+
+## Local demo
+
+In PowerShell, choose a unique app password interactively:
+
+```powershell
+$storychatPassword = Read-Host 'Owner app password (at least 12 characters)' -AsSecureString
+$env:STORYCHAT_PASSWORD = [System.Net.NetworkCredential]::new('', $storychatPassword).Password
+$env:STORYCHAT_PROVIDER = 'fake'
+node app/server.mjs
+```
+
+Open `http://127.0.0.1:8787` on the same computer and enter that app password. Create an original adult character, fictional persona and story. The explicitly labelled fake provider demonstrates favorite-color statements, map promises/delivery, and gratitude; it is a limited deterministic example, not general AI. It makes no network or subscription requests.
+
+Create a character/persona once and reuse them in another story to check isolation. A new story snapshots their definitions. Library editing, portrait uploads, regeneration and export/import are later MVP work. Memory removal leaves source messages intact; story deletion removes that story's logical records and memories while retaining its library definitions. Deleted data may remain in SQLite pages/backups until operational compaction; secure erasure is not claimed.
+
+Stop with Ctrl+C. Clear the password from the shell when finished:
+
+```powershell
+Remove-Item Env:STORYCHAT_PASSWORD
+$storychatPassword = $null
+```
+
+Optional `.env.example` shows the settings; copying it to ignored `.env` requires protecting that file. It is only loaded with `node --env-file=.env app/server.mjs`. Never commit a configured `.env` or put passwords in terminal history. The owner password is separate from ChatGPT consent.
+
+## Owner's ChatGPT connection
+
+Use the existing [local onboarding helper](../prototype/README.md) on the same Windows PC as the consent browser. Stop the app before onboarding, catalog discovery, refresh or revocation, since it owns the credential vault lock for its lifetime.
+
+```powershell
+node prototype/cli.mjs auth
+node prototype/cli.mjs accounts
+node prototype/cli.mjs models <selected-account-id>
+$env:STORYCHAT_PROVIDER = 'chatgpt'
+$env:STORYCHAT_ACCOUNT_ID = '<selected-account-id>'
+$env:STORYCHAT_MODEL = '<a-model-slug-from-that-catalog>'
+node app/server.mjs
+```
+
+For an existing registration, use `auth <selected-account-id>` instead of creating a new one. Do not paste tokens or callback URLs into chat. Configure one account ID and one model explicitly. ChatGPT is the default mode; missing configuration/sign-in keeps existing stories readable and reports an actionable error. There is no fallback provider or automatic inference retry. Requests use the same owner's ChatGPT allowance. Manage connected sessions and allowance in the provider's settings.
+
+The browser receives app session cookies, never provider credentials. Default encrypted tokens live in ignored `data/provider-spike/`; their separately protected key lives in ignored `secrets/provider-spike/`. `STORYCHAT_DATA_DIR` and `STORYCHAT_KEY_DIR` override those provider paths. Only the server process renews the selected session; do not clone rotating credentials across active processes or hosts. Same-owner Docker handoff is documented as future work, not implemented by these commands.
+
+## Persistence and recovery
+
+SQLite lives at ignored `data/storychat/storychat.sqlite`; `STORYCHAT_DB` may point to a dedicated app data directory. Production startup protects that directory with owner-only Windows ACLs or Unix mode 0700. Its parent must be dedicated to this app, since its ACL is changed. Provider secrets remain separate from the story database. Run one server per database: a `.sqlite.lock` file prevents accidental parallel startup. After a crash, first verify the original process is gone before removing only that stale lock file. Startup marks pending generations interrupted; it never resends a model request automatically.
+
+Completed replies and state commit atomically. A failed turn retains its user message and a safe error; the owner can explicitly use it as a draft for another attempt. Ambiguous HTTP sends can resume with the same request ID. Restart requires app login again; stories and controls remain. Drafts are stored on the browser device and cleared on successful logout. Final narrative appears after completed structured validation; visible incremental narrative streaming is deferred.
+
+The prototype is intentionally bounded. See `project.md` for context and record limits. Suppression matches stable keys and normalized text, not arbitrary paraphrases. Corrections/pins take priority and source IDs are validated; the model still needs quality evaluation because a permitted citation is not proof of a claim.
+
+## Verification
+
+```powershell
+node app/test.mjs
+node prototype/test.mjs
+```
+
+Expected at this revision: 27 application checks and 48 provider-spike checks pass. All ordinary tests use synthetic data, fake/scripted providers and temporary databases. Windows owner-only ACL tests and local HTTP tests require a runtime outside the restricted desktop sandbox; ACLs must not be weakened to run them.
+
+The optional live evaluation is **never** included in `test`. With an authorized account configured and app stopped, explicitly set `STORYCHAT_LIVE_EVAL=yes` and run `node app/evaluate-live.mjs`. It sends at most four requests, stopping on the first failed assertion, and keeps only synthetic evaluation data under ignored `data/live-evaluation/`. Seven filler turns are deterministic, so it measures live recall of persisted state without spending seven extra requests. Results are a bounded quality sample; no recurring work is scheduled.
+
+## Android acceptance and remote access
+
+The current local preview URL works only on the Windows PC. A phone's loopback address points to the phone. Real Android acceptance needs an existing reachable trusted HTTPS route chosen by the owner; none was configured by this work. For that later route, set `STORYCHAT_HOST` to the intended private binding and `STORYCHAT_ORIGIN` to its exact HTTPS origin. The cookie becomes Secure, Host/Origin checks use that configured origin, and the proxy must preserve the original Host. Do not expose the OAuth callback, vault, or database through the tunnel. Do not replace Access policy checks with arbitrary incoming identity headers.
+
+On the actual Android device, verify owner login; creating character/persona/story; entering a fact and promise; reading the reply; opening source links; correction, pinning and removal; saving all three writing controls; closing/reopening the browser; and resuming after server restart. Record browser/device and results. Home-screen installation, virtual keyboard/background/stream recovery and actual Docker/Tunnel checks remain milestone 3. No service worker caches private data; the manifest and original SVG are groundwork, not proof of Android installability.
+
+No Docker host, tunnel, DNS, public service, paid fallback or recurring model workload is provisioned by this prototype.

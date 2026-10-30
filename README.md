@@ -6,9 +6,11 @@ The application has no in-app payments, premium tiers, virtual currency, or paid
 
 ## Current stage
 
-Milestone 1 is a provider-feasibility prototype, not the finished Android application. It investigates an officially supported connection using an eligible ChatGPT subscription and does not implement a separately billed API fallback.
+Milestone 1 personal provider feasibility is complete and pushed. Milestone 2 has a working Node 24/SQLite continuity prototype and original browser interface, 27 passing automated checks and a bounded successful live ChatGPT scenario. Real Android acceptance is pending an owner-selected device-accessible route. Docker deployment and a finished installable Android experience remain ahead.
 
-The prototype uses a local command-line onboarding flow. On 2026-10-30 it completed owner-authorized sign-in, catalog discovery, one structured story reply, credential renewal, and confirmed revocation. It is not a web server, Android sign-in implementation, multi-user service, or production credential manager. Milestone 1 personal provider feasibility is complete. Actual personal Docker/Android deployment remains untested.
+The app has one owner login and one protected ChatGPT connection. It persists independent stories, source-linked memories, promises, relationships and fictional thoughts. The owner can inspect, correct, pin and remove memories. Explicit fake mode supports development without model calls. No separately billed API route exists. Local command-line onboarding is verified; phone-only provider sign-in and same-owner credential transfer to Docker remain untested.
+
+Use [running instructions](docs/running.md) for startup, configuration, tests and the real-device checklist. No dependency installation or frontend build is required.
 
 ## Documents
 
@@ -18,10 +20,11 @@ The prototype uses a local command-line onboarding flow. On 2026-10-30 it comple
 - [Hosting assessment](docs/milestone-1-hosting.md): Android onboarding, credential ownership, Docker, and Tunnel considerations.
 - [Verification report](docs/milestone-1-verification.md): deterministic tests, findings, and gaps.
 - [Milestone status](docs/milestone-1-status.md): verified outcomes and remaining completion criteria.
+- [Continuity verification](docs/milestone-2-verification.md): independent software checks, live evidence and remaining Android acceptance.
 
 ## Deployment direction
 
-The eventual application is proposed as an installable PWA backed by a Docker-hosted server and durable database. The owner's installation will use existing Cloudflare Tunnel infrastructure. One owner-managed ChatGPT connection serves the whole instance for the owner alone. Independent stories retain separate memory and relationship contexts. ChatGPT is the selected provider; no separately billed API fallback is enabled. Application accounts, ingress access control, and provider authorization remain separate layers.
+The application targets an installable PWA backed by a Docker-hosted server and durable database. The prototype uses a buildless frontend and built-in SQLite. The owner's installation will use existing Cloudflare Tunnel infrastructure. One owner-managed ChatGPT connection serves the whole instance for the owner alone. Independent stories retain separate memory and relationship contexts. Application login, ingress access control, and provider authorization remain separate layers.
 
 Public source does not make a running instance or personal story data public. Private research, credentials, runtime data, and third-party artifacts are excluded from version control. Use original synthetic examples in public tests and documentation.
 

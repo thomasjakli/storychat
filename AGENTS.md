@@ -4,9 +4,9 @@
 
 Read `project.md` before planning or implementing changes. It defines the product scope, confirmed requirements, proposed architecture, milestones, and unresolved decisions. This file defines how agents should work within that scope.
 
-The project is an Android-first character storytelling app solely for its owner. Persistent memories, open promises, fictional inner thoughts, and evolving relationships are the core experience. Deployment should use the owner's existing Docker hosts, available locally and on a public VPS through Cloudflare Zero Trust Tunnel. The specific host, hostname, and Access policy remain open. An installable PWA is proposed; the framework is not yet selected.
+The project is an Android-first character storytelling app solely for its owner. Persistent memories, open promises, fictional inner thoughts, and evolving relationships are the core experience. Deployment should use the owner's existing Docker hosts, available locally and on a public VPS through Cloudflare Zero Trust Tunnel. The specific host, hostname, and Access policy remain open. An installable PWA is proposed; milestone 2 uses a buildless browser UI, Node 24 and SQLite.
 
-The public project specification is independent of private reference research. Source may be published while deployed instances remain restricted to authorized users. Local research and third-party artifacts are excluded from publication. Do not assume that an application, test suite, build command, or verified subscription integration already exists.
+The public project specification is independent of private reference research. Source may be published while deployed instances remain restricted to the owner. Local research and third-party artifacts are excluded from publication. Milestone 1 has a verified local subscription spike; milestone 2 has a Node 24/SQLite browser prototype and deterministic tests. Consult `project.md` and `docs/running.md` for current evidence, commands and remaining device/deployment gates; do not infer production readiness from their presence.
 
 ## Working rules
 

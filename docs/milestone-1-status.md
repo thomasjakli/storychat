@@ -48,6 +48,6 @@ Exactly one inference request was made; no repair/retry call or separately bille
 - A remote Android PWA cannot assume its browser's loopback callback reaches the Docker host. Desktop-assisted onboarding is the initial candidate, not verified phone-only sign-in.
 - No live credentials, personal stories, or authorization URLs are included in these deliverables. Runtime data and keys remain ignored.
 - No persistent story state, memory engine, Android UI, container deployment, or public service has been implemented by this milestone.
-- Milestone 1 source and its verification reports are ready for the initial implementation commit; later milestone work is recorded separately.
+- Milestone 1 source and verification reports were committed and pushed as [`a8cd54d`](https://github.com/thomasjakli/storychat/commit/a8cd54d). Later milestone work is recorded separately.
 
 Proceed to milestone 2: persistent story state and memory continuity. Use fake-provider tests for ordinary development and bounded owner-authorized live checks as needed. Docker/Android integration remains later acceptance work; milestone 1 completion does not claim that deployment is verified. Reauthorization will be needed before another live request because the test session was revoked.

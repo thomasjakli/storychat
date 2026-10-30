@@ -13,6 +13,7 @@ async function protect(directory) {
     { env: { ...process.env, STORYCHAT_PROTECT_PATH: directory }, stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
   } else await chmod(directory, 0o700);
 }
+export { protect as protectDirectory };
 export class Vault {
   constructor(dataDirectory, keyDirectory) {
     this.directory = resolve(dataDirectory); this.keyDirectory = resolve(keyDirectory);
