@@ -40,3 +40,13 @@ Roles: Story/Memory owns narrative/context convention and evidence tests; Androi
 ## Owner preference update: local recognition (2026-10-31)
 
 Phone-local recognition is strongly preferred. The browser-service suggestion above is superseded by the [local speech feasibility plan](local-speech-plan.md): evaluate pinned same-origin WASM/model inference in a browser Worker, with no automatic cloud or server fallback. Stable Android Firefox performance and offline model readiness must be proven on a real device before claiming support. Dictation is separate from reply read-aloud; narration formatting may proceed independently.
+
+## Planned readability refinement (owner request, 2026-10-31)
+
+Paired single-star narration must render as a separate paragraph-like block even when authored inline. Example raw input `Hallo. *Sie stellt die Tasse ab.* Wie geht es dir?` displays speech, then narration, then speech on separate paragraphs, with modest space before/after narration. This extends the existing italic/gray presentation; it is not implemented by this planning entry.
+
+Use safe block-level layout within the message container (for example dedicated text and narration blocks), not injected HTML. Preserve raw stored text, source references, exports, selection wrapping and prompt semantics. If narration already begins on a new line, reuse that boundary rather than inserting an empty paragraph. Following speech always starts a new paragraph; consecutive narrative spans remain distinct with restrained spacing. Avoid leading/trailing blank paragraphs when narration begins/ends the message. Preserve intentional internal line breaks, including multiline narration. Literal escaped stars, empty/unmatched delimiters and double-star runs retain their existing behavior. All surfaces using the renderer, including user/assistant messages and authored openings, should behave consistently.
+
+Acceptance: inline speech/narration/speech, leading/trailing narration, adjacent spans, existing newlines/blank lines, multiline text and literal stars; unchanged raw-text roundtrip and zero inference/state changes. Inspect EN/DE360px/390px/desktop for paragraph spacing and long replies; real Android remains separately verified. Dedicated chronological thought blocks remain explicitly typed content; stars alone do not identify a passage as private thought.
+
+Readability refinement implementation2026-10-31: safe narration spans now display as paragraph-like blocks with modest margins; surrounding newline boundaries trimmed for layout only. Parser/raw persistence unchanged. Local narration tests pass; release visual/device evidence recorded in thought-reading-update.md.

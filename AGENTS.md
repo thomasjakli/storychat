@@ -132,6 +132,26 @@ Expected outputs: Deployment configuration, operational documentation, restored-
 
 Boundary: Keep deployment private to the intended users. Do not provision paid hosting, expose a service publicly, or alter external infrastructure without applicable user authorization.
 
+### 7. UX and Accessibility Reviewer
+
+Purpose: Independently assess whether the interface is understandable, comfortable and accessible, and propose focused improvements.
+
+When to use: Assign for substantial UI changes (new navigation, major screens or interaction flows) or explicitly requested UX passes. This is not a mandatory assignment for every development pass. Existing visual release checks still apply even when this role is not assigned. Listing this role does not authorize spawning an agent.
+
+Responsibilities:
+
+- Review complete owner journeys, information hierarchy, discoverability, navigation and consistency across characters, personas, stories and settings.
+- Evaluate Android reading comfort, long replies, narration/thought distinctions, font-size controls, keyboard behavior, scroll position and draft preservation.
+- Inspect rendered screens and interactions in English/German at 360px, 390px and desktop, including long labels, large text, loading, empty, disabled and error states.
+- Check contrast, touch targets, focus visibility/order, accessible names and semantics; exercise keyboard and assistive technology when available. Distinguish measured checks from source review and untested accessibility assumptions.
+- Review designs early enough to influence implementation, then verify the integrated result. Work independently of the primary UI implementer where practical.
+- Turn owner-reported usability defects into explicit regression scenarios, including mobile filter alignment and primary-button readability.
+- Suggest prioritized, concrete improvements with rationale and expected benefit. Distinguish usability/accessibility defects from optional aesthetic preferences and scope expansion.
+
+Expected outputs: A concise review with affected journeys/screens, reproducible findings, severity/priority, proposed changes and acceptance checks. Record which rendered states were inspected, what was actually exercised, and remaining device or assistive-technology gaps. Recheck fixes before closing findings.
+
+Boundary: Recommendations are proposals, not automatically confirmed requirements. Coordinate priorities with the planner; do not redesign unrelated flows or modify production data/infrastructure. Use original synthetic fixtures and preserve private research. Viewport emulation is not real Android or screen-reader verification. This role complements the Android developer and independent software/continuity QA; it does not replace either.
+
 ## Suggested staffing by phase
 
 | Phase | Primary role | Useful supporting role |
@@ -141,8 +161,9 @@ Boundary: Keep deployment private to the intended users. Do not provision paid h
 | Memory continuity prototype | Story and Memory Engineer | Quality and Continuity Tester |
 | Android personal MVP | Android Experience Developer | Story and Memory Engineer |
 | Release verification and deployment | Quality and Continuity Tester | Self-hosting and Security Engineer |
+| Substantial UI updates or dedicated UX passes | Android Experience Developer or Product and Architecture Planner | UX and Accessibility Reviewer |
 
-Start with the planner and integration roles. Expand assignments as concrete implementation work becomes available; six roles do not require six simultaneous agents.
+Start with the planner and integration roles. Expand assignments as concrete implementation work becomes available; role definitions do not require simultaneous agents for every role.
 
 ## Handoff and collaboration
 

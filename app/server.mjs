@@ -170,7 +170,7 @@ export function createApplication({store, provider, password, origin, secureCook
         }
         const creates = {'/api/characters':'createCharacter','/api/personas':'createPersona','/api/stories':'createStory'};
         if (req.method === 'POST' && creates[path]) {const data=await body(req,131072);if(['/api/characters','/api/personas'].includes(path) && data.cover){if(!media)throw fail('invalid','Media unavailable.');await media.metadata(data.cover);}return send(res,201,store[creates[path]](data));}
-        const match = /^\/api\/stories\/([a-zA-Z0-9-]+)(?:\/(controls|turns|memories)(?:\/([a-zA-Z0-9-]+))?)?$/.exec(path);
+        const match = /^\/api\/stories\/([a-zA-Z0-9-]+)(?:\/(controls|turns|memories|thoughts)(?:\/([a-zA-Z0-9-]+))?)?$/.exec(path);
         if (!match) return send(res,404,{error:{code:'not_found',message:'Route not found.'}});
         const [,id,action,memoryId]=match;
         if (req.method === 'GET' && !action) return send(res,200,store.getStory(id));
@@ -178,6 +178,23 @@ export function createApplication({store, provider, password, origin, secureCook
         if (req.method === 'PATCH' && action === 'controls') return send(res,200,store.setControls(id,await body(req)));
         if (action === 'memories' && memoryId && req.method === 'PATCH') return send(res,200,store.editMemory(id,memoryId,await body(req)));
         if (action === 'memories' && memoryId && req.method === 'DELETE') return send(res,200,store.deleteMemory(id,memoryId));
+        if(action==='thoughts') {
+          if(req.method==='POST' && memoryId==='cancel') {const data=await body(req);if(!data||Object.keys(data).join(',')!=='requestId')throw fail('invalid','Invalid cancellation.');return send(res,200,store.cancelThought(id,data.requestId));}
+          if(req.method==='DELETE' && memoryId) return send(res,200,store.deleteThought(id,memoryId));
+          if(req.method==='POST' && !memoryId) {
+            const data=await body(req);
+            const previous=(store.getStory(id).thoughtRequests||[]).find(r=>r.requestId===data.requestId);
+            if(previous){store.beginThought(id,data);return send(res,202,{request:previous});}
+            if(active)throw fail('conflict','The instance is already generating.');
+            if(provider.unavailable)return send(res,503,{error:publicFailure(provider.unavailable)});
+            if(typeof provider.generateThought!=='function')throw fail('invalid','Thought generation is unavailable.');
+            const {request,context}=store.beginThought(id,data);active=true;
+            const job=Promise.resolve().then(()=>provider.generateThought(context)).then(output=>store.finishThought(id,request.requestId,output)).catch(error=>{
+              try{store.failThought(id,request.requestId,publicFailure(error).code);}catch{}
+            }).finally(()=>{active=false;jobs.delete(job);});jobs.add(job);
+            return send(res,202,{request:store.getStory(id).thoughtRequests.find(r=>r.requestId===request.requestId)});
+          }
+        }
         if (req.method === 'POST' && action === 'turns' && (!memoryId || memoryId==='replace')) {
           const data = await body(req);
           const begin = () => memoryId==='replace' ? store.beginReplacement(id,data) : store.beginTurn(id,data);

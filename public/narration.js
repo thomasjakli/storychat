@@ -24,7 +24,7 @@ function wrap(text,start,end,max=8000){
  if(text.length+2>max)return null;
  return {text:text.slice(0,start)+'*'+text.slice(start,end)+'*'+text.slice(end),start:start+1,end:end+1};
 }
-function render(element,text){element.replaceChildren();for(const part of parse(text)){const node=element.ownerDocument.createElement('span');if(part.narration)node.className='narration-span';node.textContent=part.text;element.append(node);}return element;}
+function render(element,text){element.replaceChildren();const parts=parse(text);for(const part of parts){const value=part.text.replace(/^\n+|\n+$/g,'');if(!value.trim())continue;const node=element.ownerDocument.createElement('span');node.className=part.narration?'narration-span narration-block':'speech-block';node.textContent=value;element.append(node);}return element;}
 function attach(textarea,button,onLimit){
  let saved=null;
  const capture=()=>{saved={value:textarea.value,start:textarea.selectionStart,end:textarea.selectionEnd};};

@@ -23,3 +23,5 @@ Before upgrading, record the current immutable image digest and export a private
 
 
 Standalone library transfer: use the character/persona detail export and its library import preview to add one independent item, including its picture. These packages use the existing versioned notebook/media envelope restricted to one library record and no stories. Item import assigns fresh identities; it is not notebook recovery and does not preserve original item IDs, timestamps or library version. Full notebook recovery retains its collision checks. Expanded persona fields require a compatible release. See [refinement update](refinement-update.md).
+
+Thought timeline compatibility: current backups/exports support typed fictional thought messages and validated request history. Portable export omits request contexts/history; offline logical backup retains them. Older releases may reject these stories. Restore a pre-upgrade backup into fresh storage for rollback. See [thought/reading release guide](thought-reading-update.md).

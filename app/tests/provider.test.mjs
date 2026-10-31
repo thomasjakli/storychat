@@ -64,7 +64,7 @@ test('ChatGPT owns vault lifetime, sends complete strict state schema and persis
     assert.match(body.instructions, /untrusted narrative data/); assert.match(body.instructions, /wall-clock/);
     return streamed(envelope());
   } });
-  assert.deepEqual(Object.keys(provider).sort(), ['close', 'generate', 'model', 'name']);
+  assert.deepEqual(Object.keys(provider).sort(), ['close', 'generate', 'generateThought', 'model', 'name']);
   assert.equal(vault.stats.released, 0);
   assert.deepEqual(await provider.generate(context()), envelope()); assert.equal(inference, 1); assert.equal(vault.stats.saves, 0);
   await provider.close(); assert.equal(vault.stats.released, 1);
@@ -109,4 +109,16 @@ test('oversized context is refused before an inference request', async () => {
   } });
   await assert.rejects(provider.generate({ ...context(), summary: 'x'.repeat(128001) }), { code: 'context_limit' });
   assert.equal(inference, 0); await provider.close();
+});
+
+ test('dedicated thought generation uses bounded schema and no turn changes',async()=>{
+ const vault=vaultFixture();let calls=0;
+ const provider=await createProvider({accountId:'owner',model:'selected',vault,fetcher:async(url,options)=>{
+  if(url.endsWith('/models'))return catalog();calls++;const b=JSON.parse(options.body);
+  assert.deepEqual(Object.keys(b.text.format.schema.properties).sort(),['sources','text']);
+  assert.match(b.instructions,/never model reasoning/);assert.match(b.instructions,/Do not advance fictional time/);
+  return streamed({text:'I am curious about the map.',sources:['u1']});
+ }});
+ assert.deepEqual(await provider.generateThought(context()),{text:'I am curious about the map.',sources:['u1']});assert.equal(calls,1);await provider.close();
+ const fake=await createProvider({mode:'fake'});assert.match((await fake.generateThought(context())).text,/FAKE DEMO/);await fake.close();
 });

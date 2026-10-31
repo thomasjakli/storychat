@@ -46,7 +46,7 @@ async function api(path, options = {}) {
 function stopPolling() { clearTimeout(state.poll); state.poll = null; }
 function lockView() {
   state.sessionEpoch += 1;
-  stopPolling(); state.session = null; state.story = null; state.library = null; state.sendRequest = null;
+  stopPolling(); unconfirmedThought=null; state.session = null; state.story = null; state.library = null; state.sendRequest = null;
   $('messages').replaceChildren(); $('state-content').replaceChildren(); $('story-list').replaceChildren();$('character-grid').replaceChildren();$('character-detail').replaceChildren();$('definition-form').reset();
   if(typeof clearPersonaView==='function')clearPersonaView();
   $('message').value = ''; $('password').value = ''; $('logout').hidden = true; $('provider-badge').hidden = true;
@@ -113,7 +113,7 @@ async function openStory(id) {
   schedulePoll();
 }
 function lastGeneration() { return state.story?.generations?.filter(g => g.status !== 'superseded').at(-1); }
-function isGenerating() { return state.story?.generations?.some(g => activeStatuses.has(g.status)); }
+function isGenerating() { return state.story?.generations?.some(g => activeStatuses.has(g.status)) || state.story?.thoughtRequests?.some(g=>g.status==='pending'); }
 function schedulePoll(delay = 1500) {
   stopPolling();
   if (state.view === 'story-view' && state.story) state.poll = setTimeout(refreshStory, delay);
@@ -139,7 +139,8 @@ function renderStory(force = false) {
   const story = state.story;
   $('story-title').textContent = story.title;
   $('story-kicker').textContent = (uiLocale==='de'?'MIT ':'WITH ') + (story.character?.name || t('Your character'));
-  const signature = JSON.stringify({ revision: story.revision, messages: story.messages, memories: story.memories, threads: story.threads, thoughts: story.thoughts, relationship: story.relationship, scene: story.scene, generations: story.generations });
+  if(unconfirmedThought&&state.story?.thoughtRequests?.some(r=>r.requestId===unconfirmedThought.requestId))unconfirmedThought=null;
+  const signature = JSON.stringify({ revision: story.revision, messages: story.messages, memories: story.memories, threads: story.threads, thoughts: story.thoughts, relationship: story.relationship, scene: story.scene, generations: story.generations, thoughtRequests:story.thoughtRequests });
   if (force || signature !== state.lastSignature) {
     const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 260;
     const previousCount = $('messages').children.length;
@@ -155,22 +156,23 @@ function renderStory(force = false) {
     $('tone').value = controls.tone; $('detail').value = controls.detail; $('length').value = controls.length;
   }
   $('control-summary').textContent = [controls.tone,controls.detail,controls.length].map(value=>t(value[0].toUpperCase()+value.slice(1))).join(' · ');
-  renderGeneration();
+  renderGeneration(); renderThoughtControls();
 }
 function renderMessages() {
   $('messages').replaceChildren();
   for (const message of (state.story.messages || []).filter(item => !item.superseded)) {
-    const article = el('article', 'message' + (message.role === 'user' ? ' user' : message.kind === 'intro' || message.type === 'intro' ? ' intro' : ''));
+    const article = el('article', 'message' + (message.kind==='thought'?' thought':'') + (message.role === 'user' ? ' user' : message.kind === 'intro' || message.type === 'intro' ? ' intro' : ''));
     article.id = 'message-' + message.id;
-    article.append(contentEl('p', 'message-label', message.kind === 'intro' || message.type === 'intro' ? t('Intro') : message.role === 'user' ? (state.story.persona?.name || t('You')) : state.story.character?.name || t('Character')), StoryNarration.render(contentEl('div', 'message-text'), message.text));
+    article.append(contentEl('p', 'message-label', message.kind==='thought'?t('Inner thought'): message.kind === 'intro' || message.type === 'intro' ? t('Intro') : message.role === 'user' ? (state.story.persona?.name || t('You')) : state.story.character?.name || t('Character')), StoryNarration.render(contentEl('div', 'message-text'), message.text));
+    if(message.kind==='thought'){const actions=el('div','thought-actions');actions.append(button('Replace thought','quiet',()=>generateThought(message.id)),button('Delete thought','quiet',()=>deleteThought(message.id)));sourceButtons(actions,message.sources);article.append(actions);}
     $('messages').append(article);
   }
   if (!$('messages').children.length) $('messages').append(el('p', 'empty-state', 'The scene is yours to begin. Write the first moment below.'));
 }
 function renderGeneration() {
   const status = $('generation-status'); status.replaceChildren(); status.classList.remove('error');
-  const generation = lastGeneration(); const pending = isGenerating();
-  $('send').disabled = state.busy || pending;
+  const generation = lastGeneration(); const pending = state.story?.generations?.some(g=>activeStatuses.has(g.status));
+  $('send').disabled = state.busy || isGenerating();
   $('send').textContent = pending ? 'Writing…' : 'Send ↑';
   if (pending) {
     status.textContent = 'The next moment is taking shape. You can leave and return; this reply stays with the story.';
@@ -249,7 +251,7 @@ function renderState() {
     section('Remembered', story.memories, 'Shared facts and moments will appear here. You can correct, pin, or remove them.', 'memory'),
     section('Unfinished threads', story.threads, 'Promises and plans will stay here until the story resolves them.'),
     section('The relationship', story.relationship, 'Meaningful changes grow from what happens between you.'),
-    section('Fictional inner thoughts', story.thoughts, 'Authored character thoughts will appear here. These are part of the fiction, separate from model reasoning.'));
+    section('Fictional inner thoughts', [...(story.thoughts||[]),...story.messages.filter(m=>m.kind==='thought'&&!m.superseded).slice(-8).map(m=>({...m,key:m.id}))], 'Authored character thoughts will appear here. These are part of the fiction, separate from model reasoning.'));
 }
 async function mutateMemory(id, changes) {
   try { state.story = await api(`/api/stories/${state.story.id}/memories/${id}`, { method: 'PATCH', body: JSON.stringify(changes) }); renderStory(); showNotice('Memory updated.'); }
@@ -472,3 +474,19 @@ window.visualViewport?.addEventListener('resize',()=>{document.documentElement.s
 
 StoryNarration.attach($('message'),$('mark-narration'),()=>showNotice('Not enough space to add narration markers.',true));
 StoryNarration.attach($('replace-text'),$('mark-replacement-narration'),()=>showNotice('Not enough space to add narration markers.',true));
+
+// Reading preferences never enter story/provider state.
+const chatSizes=[85,100,115,130,150],chatSizeKey='storychat.chatTextSize.v1';let chatSize=100;
+try{const saved=Number(localStorage.getItem(chatSizeKey));if(chatSizes.includes(saved))chatSize=saved;}catch{}
+const reading=el('section','reading-controls'),readingTitle=el('h2','',t('Chat text size')),readingButtons=el('div','reading-buttons'),sizeLabel=el('span');sizeLabel.setAttribute('role','status');
+const smaller=button('Decrease text size','quiet',()=>setChatSize(chatSizes[Math.max(0,chatSizes.indexOf(chatSize)-1)])),larger=button('Increase text size','quiet',()=>setChatSize(chatSizes[Math.min(chatSizes.length-1,chatSizes.indexOf(chatSize)+1)])),resetSize=button('Reset to default','quiet',()=>setChatSize(100));
+readingButtons.append(smaller,sizeLabel,larger,resetSize);reading.append(readingTitle,readingButtons);$('settings-tools').append(reading);
+function setChatSize(value){const following=innerHeight+scrollY>=document.documentElement.scrollHeight-100;const anchor=[...document.querySelectorAll('#messages .message')].find(n=>n.getBoundingClientRect().bottom>0),top=anchor?.getBoundingClientRect().top;chatSize=value;try{localStorage.setItem(chatSizeKey,String(value));}catch{}applyChatSize();requestAnimationFrame(()=>{if(state.view!=='story-view')return;if(following)window.scrollTo(0,document.documentElement.scrollHeight);else if(anchor?.isConnected)window.scrollBy(0,anchor.getBoundingClientRect().top-top);});}
+function applyChatSize(){document.documentElement.style.setProperty('--chat-text-scale',String(chatSize/100));sizeLabel.textContent=chatSize+'%';smaller.disabled=chatSize===85;larger.disabled=chatSize===150;}applyChatSize();
+const thoughtBar=el('section','thought-controls'),thoughtGenerate=button('Generate inner thought','quiet',()=>generateThought()),thoughtStatus=el('p','hint'),thoughtCancel=button('Cancel thought generation','quiet',()=>cancelThought());thoughtStatus.setAttribute('role','status');const thoughtCheck=button('Check thought status','quiet',async()=>{try{const checkId=state.story?.id;await refreshStory();if(state.story?.id!==checkId||unconfirmedThought?.storyId!==checkId)return;if(unconfirmedThought&&!state.story?.thoughtRequests?.some(r=>r.requestId===unconfirmedThought.requestId))unconfirmedThought=null;renderThoughtControls();}catch(e){showNotice(e.message,true);}});thoughtBar.append(thoughtCheck,thoughtGenerate,el('p','hint',t('One fictional thought using your ChatGPT allowance. It is not spoken dialogue.')),thoughtStatus,thoughtCancel);$('composer').before(thoughtBar);
+let thoughtActionBusy=false,unconfirmedThought=null;
+function unknownThoughtHere(){return !!unconfirmedThought&&unconfirmedThought.storyId===state.story?.id;}
+function renderThoughtControls(){const pending=state.story?.thoughtRequests?.find(r=>r.status==='pending'),last=state.story?.thoughtRequests?.at(-1);thoughtGenerate.disabled=state.busy||isGenerating()||thoughtActionBusy||unknownThoughtHere();thoughtCheck.hidden=!unknownThoughtHere();thoughtCancel.hidden=!pending;thoughtCancel.disabled=thoughtActionBusy;thoughtStatus.textContent=pending?t('Writing a fictional thought…'):unknownThoughtHere()?t('Thought request could not be confirmed. Check saved status before trying again.'):last&&['failed','interrupted','cancelled'].includes(last.status)?t('Thought generation did not complete. No partial thought was added.') : '';for(const n of document.querySelectorAll('.thought-actions button'))n.disabled=state.busy||isGenerating()||thoughtActionBusy||unknownThoughtHere();}
+async function generateThought(replaceId){if(state.busy||isGenerating()||thoughtActionBusy||unknownThoughtHere())return;const id=state.story.id,epoch=state.sessionEpoch,requestId=crypto.randomUUID();thoughtActionBusy=true;renderThoughtControls();try{await api('/api/stories/'+id+'/thoughts',{method:'POST',body:JSON.stringify({requestId,...(replaceId?{replaceId}:{})})});if(epoch!==state.sessionEpoch||state.story?.id!==id)return;unconfirmedThought=null;await refreshStory();schedulePoll(500);}catch(e){if(epoch===state.sessionEpoch&&state.story?.id===id){unconfirmedThought={storyId:id,requestId};showNotice(e.message,true);schedulePoll(500);}}finally{thoughtActionBusy=false;renderThoughtControls();}}
+async function cancelThought(){const storyId=state.story?.id,epoch=state.sessionEpoch;const r=state.story?.thoughtRequests?.find(r=>r.status==='pending');if(!r)return;thoughtActionBusy=true;try{const updated=await api('/api/stories/'+storyId+'/thoughts/cancel',{method:'POST',body:JSON.stringify({requestId:r.requestId})});if(epoch!==state.sessionEpoch||state.story?.id!==storyId)return;state.story=updated;renderStory(true);}catch(e){showNotice(e.message,true);}finally{thoughtActionBusy=false;renderThoughtControls();}}
+async function deleteThought(id){const storyId=state.story?.id,epoch=state.sessionEpoch;if(isGenerating()||!uiConfirm('Delete this fictional thought? It will no longer guide future replies.'))return;try{const updated=await api('/api/stories/'+storyId+'/thoughts/'+id,{method:'DELETE'});if(epoch!==state.sessionEpoch||state.story?.id!==storyId)return;state.story=updated;renderStory(true);}catch(e){showNotice(e.message,true);}}
