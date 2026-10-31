@@ -1,6 +1,6 @@
 # Story progression release
 
-Implemented and reviewed; release publication pending, not deployed. No UI changes planned.
+Implemented, reviewed and published; not deployed. No UI changes planned.
 
 ## Behavior
 
@@ -31,7 +31,7 @@ In a separate story, give short replies and allow character initiative. Look for
 
 ## Software verification
 
-Windows synthetic application98passed/2Linux-only skips; adapter61passed/1Linux-only skip. Independent review covered reserved-reply sources, forged missing IDs, atomic persistence/deduplication, replacement removing stale events while preserving corrected/pinned state, newest-complete-message context bounds, old-context lossless transfer compatibility and dedicated-thought restrictions. No UI change, so no new rendered-screen gate applies. Live results are separate and pending at this point.
+Windows synthetic application98passed/2Linux-only skips; adapter61passed/1Linux-only skip. Independent review covered reserved-reply sources, forged missing IDs, atomic persistence/deduplication, replacement removing stale events while preserving corrected/pinned state, newest-complete-message context bounds, old-context lossless transfer compatibility and dedicated-thought restrictions. No UI change, so no new rendered-screen gate applies. Live results are recorded separately below.
 
 ## Bounded live comparison
 
@@ -40,3 +40,14 @@ Owner selected gpt-6.1-sol. Exactly6 synthetic subscription requests completed, 
 Independent review: quiet observatory baseline offered company/activity choice (370characters); new reply developed a practical leak/footpath-map situation (1047). Greenhouse baseline already avoided exact repeated reassurance but asked another tour/wander choice (278); new reply introduced an unfinished banner, dry humor and donated plants (1056). German clockmaker baseline already introduced a watch detail/invitation (620); new reply demonstrated an orientation-dependent watch fault with optional magnifier (979). No obvious player-agency violation, history contradiction, forced romance or compulsory escalation identified. New state proposals in all3new responses were visibly supported and cited the introducing reply; all3baselines returned empty state.
 
 This supports more concrete development and retention in this small sample, not a claim that the baseline cannot progress or repetition is eliminated. New replies were longer in every pair. Three unblinded single-turn pairs do not establish long-term pacing, relationship quality or semantic correctness generally. Raw synthetic outputs remain ignored/private; no production conversations used. No further requests scheduled.
+
+## Published verification
+
+[Implementation3765cc2](https://github.com/thomasjakli/storychat/commit/3765cc2cb87eda0a06d8f3938621f6b6f0741b76). [Workflow](https://github.com/thomasjakli/storychat/actions/runs/41245880486) success: Linux101/101application and62/62adapter tests, no skips, both container lifecycle/recovery gates passed. Final local suite99passed/2Linuxskips. Six live requests only, evaluated independently; no recurring workload.
+
+```text
+ghcr.io/thomasjakli/storychat:latest
+ghcr.io/thomasjakli/storychat@sha256:e48722ffa68b1b599ccd9576e3f2ba4bbfad76f4c4364d7f4e82de06a1a19f15
+```
+
+[Independent writing assessment](story-progression-evaluation.md). [Live method](story-progression-live-evaluation.md). No new UI, infrastructure or production deployment. Future prompts change; existing transcripts remain untouched. Long-story quality remains owner follow-up.

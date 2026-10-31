@@ -1,6 +1,6 @@
 # Story progression implementation contracts
 
-2026-10-31: owner-authorized implementation, not verified live quality yet.
+2026-10-31: implemented and published; bounded live findings and limitations are recorded in story-progression-update.md.
 
 Ordinary replies may author current character actions, scene details, revelations, plausible interruptions and natural fictional time progression. Preserve corrected history, player agency, knowledge boundaries and source validation. No compulsory twist, intimacy or escalation. Dedicated thoughts stay reaction-only.
 
