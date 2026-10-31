@@ -17,9 +17,9 @@ RUN npm ci --omit=dev --ignore-scripts --include=optional
 COPY speech-spike/ ./speech-spike/
 RUN node speech-spike/prepare-assets.mjs /app/speech-assets
 
-COPY app/server.mjs app/store.mjs app/provider.mjs app/transfer.mjs app/backup.mjs app/media.mjs app/media-transfer.mjs ./app/
+COPY app/server.mjs app/store.mjs app/provider.mjs app/transfer.mjs app/item-transfer.mjs app/backup.mjs app/media.mjs app/media-transfer.mjs ./app/
 COPY prototype/auth.mjs prototype/cli.mjs prototype/connection.mjs prototype/errors.mjs prototype/handoff.mjs prototype/output.mjs prototype/provider.mjs prototype/runtime-lock.mjs prototype/stream.mjs prototype/vault.mjs ./prototype/
-COPY public/index.html public/style.css public/app.js public/narration.js public/explorer.js public/i18n.js public/icon.svg public/icon-192.png public/icon-512.png public/icon-maskable-512.png public/manifest.webmanifest ./public/
+COPY public/index.html public/style.css public/app.js public/narration.js public/explorer.js public/personas.js public/i18n.js public/icon.svg public/icon-192.png public/icon-512.png public/icon-maskable-512.png public/manifest.webmanifest ./public/
 COPY deploy/healthcheck.mjs deploy/connect-chatgpt.sh ./deploy/
 
 ENV STORYCHAT_SPEECH_ASSETS=/app/speech-assets \

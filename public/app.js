@@ -22,7 +22,7 @@ function showNotice(message, error = false) {
 function view(name) {
   state.view = name;
   $('app-nav').hidden = !state.session?.authenticated;
-  for (const id of ['loading', 'login-view', 'library-view', 'story-view', 'characters-view', 'character-view', 'settings-view']) $(id).hidden = id !== name;
+  for (const id of ['loading', 'login-view', 'library-view', 'story-view', 'characters-view', 'character-view', 'personas-view', 'persona-view', 'settings-view']) $(id).hidden = id !== name;
   $('page-footer').hidden = name === 'story-view';
 }
 async function api(path, options = {}) {
@@ -48,6 +48,7 @@ function lockView() {
   state.sessionEpoch += 1;
   stopPolling(); state.session = null; state.story = null; state.library = null; state.sendRequest = null;
   $('messages').replaceChildren(); $('state-content').replaceChildren(); $('story-list').replaceChildren();$('character-grid').replaceChildren();$('character-detail').replaceChildren();$('definition-form').reset();
+  if(typeof clearPersonaView==='function')clearPersonaView();
   $('message').value = ''; $('password').value = ''; $('logout').hidden = true; $('provider-badge').hidden = true;
   closeInspector();
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
@@ -79,6 +80,7 @@ async function initialize() {
     $('provider-badge').title = fake ? 'Deterministic synthetic responses, not live AI.' : (state.session.model || 'Owner’s ChatGPT connection');
     showNotice(typeof state.session.providerError === 'string' ? state.session.providerError : state.session.providerError?.message || '');
     await loadLibrary();
+    if(document.readyState==='loading')await new Promise(resolve=>document.addEventListener('DOMContentLoaded',resolve,{once:true}));
     if(typeof routeCurrentHash==='function')routeCurrentHash();
   } catch (error) { lockView(); showNotice(error.message, true); }
 }
@@ -408,6 +410,7 @@ function renderDefinitions() {
       const actions=el('div','entry-actions');
       actions.append(button('Edit','quiet',async()=>{
         try{record=await api('/api/'+kind+'/'+encodeURIComponent(record.id));}catch(error){showNotice(error.message,true);return;}
+        if(kind==='personas'){ $('library-dialog').close(); editPersona(record); return; }
         state.editingDefinition={kind,id:record.id}; $('definition-name').value=record.name; $('definition-text').value=record.definition;
         fillCharacterFields(record,kind); $('definition-opening').value=record.opening||''; $('definition-opening-label').hidden=kind!=='characters'; $('definition-error').hidden=true; $('definition-dialog').showModal();
       }),button('Duplicate','quiet',()=>libraryAction(kind,record,'duplicate')),button(record.archived?'Unarchive':'Archive','quiet',()=>libraryAction(kind,record,'archive')),button('Delete','danger',()=>libraryAction(kind,record,'delete')));

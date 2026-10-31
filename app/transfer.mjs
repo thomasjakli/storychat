@@ -1,4 +1,4 @@
-import {characterFields,validateCharacterFields} from './store.mjs';
+import {characterFields,validateCharacterFields,personaFields,validatePersonaFields} from './store.mjs';
 // Logical application backups never contain provider configuration or credentials.
 export const MAX_TRANSFER_BYTES = 8 * 1024 * 1024;
 const invalid = () => { throw Object.assign(new Error('Invalid or unsupported story backup.'), {code:'invalid'}); };
@@ -6,7 +6,7 @@ const check = value => { if (!value) invalid(); };
 function object(value, keys, required = keys) { check(value && typeof value === 'object' && !Array.isArray(value)); check(Object.keys(value).every(k=>keys.includes(k)) && required.every(k=>Object.hasOwn(value,k))); }
 const text = (v,max=2000) => check(typeof v==='string' && v.length<=max);
 const identifier = v => check(typeof v==='string' && /^[a-zA-Z0-9._:-]{1,100}$/.test(v));
-function definition(v,type) { object(v,['id','name','definition','version','createdAt','updatedAt','archived',...(type==='character'?[...characterFields,'draft','favorite']:[])],['id','name','definition','version','createdAt']);identifier(v.id);text(v.name,100);text(v.definition,8000);check(Number.isSafeInteger(v.version)&&v.version>0);text(v.createdAt,100);if(v.updatedAt!==undefined)text(v.updatedAt,100);for(const key of ['archived','favorite','draft'])if(v[key]!==undefined)check(typeof v[key]==='boolean');if(type==='character')validateCharacterFields(v); }
+function definition(v,type) { object(v,['id','name','definition','version','createdAt','updatedAt','archived',...(type==='character'?[...characterFields,'draft','favorite']:personaFields)],['id','name','definition','version','createdAt']);identifier(v.id);text(v.name,100);text(v.definition,8000);check(Number.isSafeInteger(v.version)&&v.version>0);text(v.createdAt,100);if(v.updatedAt!==undefined)text(v.updatedAt,100);for(const key of ['archived','favorite','draft'])if(v[key]!==undefined)check(typeof v[key]==='boolean');if(type==='character')validateCharacterFields(v);else validatePersonaFields(v); }
 
 function story(v) {
   object(v,['id','title','character','persona','controls','revision','scene','messages','memories','threads','relationship','thoughts','summary','generations','suppression']);
@@ -39,7 +39,7 @@ export function validateTransfer(value) {
 }
 export function exportData(store, {includeHistory=false} = {}) {
   return store.transaction(()=>{
-    const library=store.db.prepare('SELECT type,data FROM library').all().map(r=>({type:r.type,data:r.type==='character'?store.definition(JSON.parse(r.data).id,'character'):JSON.parse(r.data)}));
+    const library=store.db.prepare('SELECT type,data FROM library').all().map(r=>({type:r.type,data:store.definition(JSON.parse(r.data).id,r.type)}));
     const stories=store.db.prepare('SELECT data FROM stories').all().map(r=>{const s=JSON.parse(r.data);if(s.generations.some(g=>g.status==='pending'))throw Object.assign(new Error('Wait for the active reply before exporting.'),{code:'conflict'});if(!includeHistory)s.generations=[];return s;});
     return validateTransfer({format:'storychat',version:1,library,stories});
   });

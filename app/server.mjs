@@ -4,9 +4,10 @@ import { readFile, open, readdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.mjs';
-import {exportBundle,splitBundle,stageBundle} from './media-transfer.mjs';
+import {exportBundle,splitBundle,stageBundle,validateItemBundle,stageItemBundle} from './media-transfer.mjs';
 import { MediaStore, MAX_UPLOAD_BYTES, MAX_MEDIA_BACKUP_BYTES, collectMediaReferences } from './media.mjs';
 import { exportData, importData, MAX_TRANSFER_BYTES, validateTransfer } from './transfer.mjs';
+import {validateItem,exportItem,importItem} from './item-transfer.mjs';
 import { createProvider } from './provider.mjs';
 import { protectDirectory } from '../prototype/vault.mjs';
 import { acquireRuntimeLock } from '../prototype/runtime-lock.mjs';
@@ -139,6 +140,21 @@ export function createApplication({store, provider, password, origin, secureCook
           importing=true;
           try {const value=await body(req,media?MAX_MEDIA_BACKUP_BYTES:MAX_TRANSFER_BYTES);validateTransfer(splitBundle(value).data);const staged=await stageBundle(value,media);try{return send(res,201,importData(store,staged.data));}catch(e){await staged.rollback();throw e;}} finally {importing=false;}
         }
+        const itemExport=/^\/api\/(characters|personas)\/([a-zA-Z0-9-]+)\/export$/.exec(path);
+        if(req.method==='GET' && itemExport){
+          const type=itemExport[1]==='characters'?'character':'persona';
+          res.setHeader('Content-Disposition',`attachment; filename="storychat-${type}.json"`);
+          return send(res,200,await exportBundle(exportItem(store,type,itemExport[2]),media));
+        }
+        if(req.method==='POST' && ['/api/items/preview','/api/items/import'].includes(path)){
+          const value=await body(req,media?MAX_MEDIA_BACKUP_BYTES:MAX_TRANSFER_BYTES);
+          validateItem(splitBundle(value).data);
+          await validateItemBundle(value,media);
+          if(path.endsWith('/preview')){const entry=splitBundle(value).data.library[0];return send(res,200,{type:entry.type,data:entry.data});}
+          if(active)throw fail('conflict','Wait for generation to finish before importing.');
+          const staged=await stageItemBundle(value,media);
+          try{return send(res,201,importItem(store,staged.data));}catch(error){await staged.rollback();throw error;}
+        }
         const definition = /^\/api\/(characters|personas)\/([a-zA-Z0-9-]+)(?:\/(duplicate))?$/.exec(path);
         if (definition) {
           const [,category,recordId,operation]=definition, type=category==='characters'?'character':'persona';
@@ -147,13 +163,13 @@ export function createApplication({store, provider, password, origin, secureCook
           if (req.method==='DELETE' && !operation) {store.deleteDefinition(type,recordId);return send(res,200,{deleted:true});}
           if (req.method==='PATCH' && !operation) {
             const data=await body(req,131072);
-            if(type==='character' && data.cover) {if(!media) throw fail('invalid','Media unavailable.');await media.metadata(data.cover);}
+            if(data.cover) {if(!media) throw fail('invalid','Media unavailable.');await media.metadata(data.cover);}
             return send(res,200,store.updateDefinition(type,recordId,data));
           }
           return send(res,405,{error:{code:'invalid',message:'Method not supported.'}});
         }
         const creates = {'/api/characters':'createCharacter','/api/personas':'createPersona','/api/stories':'createStory'};
-        if (req.method === 'POST' && creates[path]) {const data=await body(req,131072);if(path==='/api/characters' && data.cover){if(!media)throw fail('invalid','Media unavailable.');await media.metadata(data.cover);}return send(res,201,store[creates[path]](data));}
+        if (req.method === 'POST' && creates[path]) {const data=await body(req,131072);if(['/api/characters','/api/personas'].includes(path) && data.cover){if(!media)throw fail('invalid','Media unavailable.');await media.metadata(data.cover);}return send(res,201,store[creates[path]](data));}
         const match = /^\/api\/stories\/([a-zA-Z0-9-]+)(?:\/(controls|turns|memories)(?:\/([a-zA-Z0-9-]+))?)?$/.exec(path);
         if (!match) return send(res,404,{error:{code:'not_found',message:'Route not found.'}});
         const [,id,action,memoryId]=match;
@@ -178,7 +194,7 @@ export function createApplication({store, provider, password, origin, secureCook
         }
         return send(res,405,{error:{code:'invalid',message:'Method not supported.'}});
       }
-      const files = {'/':'index.html','/index.html':'index.html','/narration.js':'narration.js','/explorer.js':'explorer.js','/i18n.js':'i18n.js','/app.js':'app.js','/style.css':'style.css','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest','/icon.svg':'icon.svg','/icon-192.png':'icon-192.png','/icon-512.png':'icon-512.png','/icon-maskable-512.png':'icon-maskable-512.png'};
+      const files = {'/':'index.html','/index.html':'index.html','/narration.js':'narration.js','/explorer.js':'explorer.js','/personas.js':'personas.js','/i18n.js':'i18n.js','/app.js':'app.js','/style.css':'style.css','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest','/icon.svg':'icon.svg','/icon-192.png':'icon-192.png','/icon-512.png':'icon-512.png','/icon-maskable-512.png':'icon-maskable-512.png'};
       if (req.method !== 'GET' || !files[path]) return send(res,404,{error:{code:'not_found',message:'Not found.'}});
       const extension=files[path].split('.').pop();
       const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json',png:'image/png',svg:'image/svg+xml'};

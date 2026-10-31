@@ -8,6 +8,7 @@ app/**
 !app/store.mjs
 !app/provider.mjs
 !app/transfer.mjs
+!app/item-transfer.mjs
 !app/backup.mjs
 !prototype/
 prototype/**
@@ -39,6 +40,7 @@ deploy/**
 !app/media-transfer.mjs
 
 !public/explorer.js
+!public/personas.js
 !public/i18n.js
 
 !public/icon-192.png

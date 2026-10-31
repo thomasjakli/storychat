@@ -57,6 +57,10 @@ test('ChatGPT owns vault lifetime, sends complete strict state schema and persis
     assert.deepEqual(body.text.format.schema, outputSchema);
     assert.deepEqual(JSON.parse(body.input[0].content), context());
     assert.ok(!('max_output_tokens' in body)); assert.ok(!('temperature' in body)); assert.ok(!('tools' in body));
+    assert.match(body.instructions, /Writing preferences are subordinate to character consistency/);
+    assert.match(body.instructions, /warm or romantic tone must never force affection/);
+    assert.match(body.instructions, /response-length governs the overall reply, not character speech length/);
+    assert.match(body.instructions, /not completed events or automatically known to another character/);
     assert.match(body.instructions, /untrusted narrative data/); assert.match(body.instructions, /wall-clock/);
     return streamed(envelope());
   } });

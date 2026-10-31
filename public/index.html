@@ -16,6 +16,7 @@
   <script src="/narration.js" defer></script>
   <script src="/app.js" defer></script>
   <script src="/explorer.js" defer></script>
+  <script src="/personas.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -23,7 +24,7 @@
     <a class="brand" href="/" aria-label="Storychat home"><span class="brand-symbol" aria-hidden="true">✦</span> storychat<span class="brand-dot">.</span></a>
     <div class="masthead-actions"><label class="locale-control"><span class="sr-only">Language</span><select id="ui-language" aria-label="Language"><option value="en">English</option><option value="de">Deutsch</option></select></label><span id="provider-badge" class="badge" hidden></span><button id="logout" class="quiet" hidden>Lock app</button></div>
   </header>
-  <nav id="app-nav" class="app-nav" hidden><button id="nav-stories" class="quiet">Stories</button><button id="nav-characters" class="quiet">Characters</button><button id="nav-settings" class="quiet">Settings</button></nav>
+  <nav id="app-nav" class="app-nav" hidden><button id="nav-stories" class="quiet">Stories</button><button id="nav-characters" class="quiet">Characters</button><button id="nav-personas" class="quiet">Personas</button><button id="nav-settings" class="quiet">Settings</button></nav>
   <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
   <main id="main">
     <section id="loading" class="gate"><p class="eyebrow">YOUR PRIVATE STORY SPACE</p><h1>Opening your notebook…</h1></section>
@@ -44,6 +45,7 @@
       <div id="story-list" class="story-grid"></div>
       <section class="library-foot"><span aria-hidden="true">✧</span><p>Your characters can cross into new stories.<br>Their memories stay with the story where they began.</p></section>
     </section>
+    <section id="personas-view" class="library" hidden></section><section id="persona-view" class="library" hidden></section>
     <section id="characters-view" class="library" hidden><div class="section-heading"><div><p class="eyebrow">YOUR CAST</p><h1>Meet your next story.</h1></div><button id="create-character" class="primary">+ Create character</button></div><form id="character-search" class="explorer-filters"><label>Search<input id="character-query" maxlength="200" type="search" placeholder="Name, intro or tags"></label><label>Category<input id="character-category" maxlength="80"></label><label>Tag<input id="character-tag" maxlength="60"></label><label>Sort<select id="character-sort"><option value="recent">Recently added</option><option value="name">Name</option><option value="used">Recently used</option></select></label><label>Status<select id="character-status"><option value="active">Active</option><option value="archived">Archived</option><option value="all">All</option></select></label><label class="check-label"><input id="character-favorites" type="checkbox">Favorites only</label><button class="primary" type="submit">Search</button><button id="clear-search" type="button" class="quiet">Clear filters</button></form><p id="character-results" class="hint" role="status"></p><div id="character-grid" class="character-grid"></div><div class="entry-actions"><button id="characters-prev" class="quiet">Previous</button><button id="characters-next" class="quiet">Next</button></div></section>
 <section id="character-view" class="library" hidden><button id="character-back" class="quiet">← Characters</button><div id="character-detail"></div></section>
 <section id="settings-view" class="library" hidden><h1>Settings</h1><p>Language is saved in this browser. Story text is never translated.</p><div id="settings-tools"></div><section class="character-section"><h2>Image storage</h2><p id="media-usage" class="hint" role="status"></p><button id="refresh-media-usage" class="quiet">Refresh storage usage</button><button id="delete-unused-media" class="danger">Delete unused images</button></section></section>

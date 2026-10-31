@@ -24,5 +24,10 @@
 @media(max-width:360px){.explorer-filters{grid-template-columns:minmax(0,1fr)}.character-actions{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:580px){.explorer-filters label:nth-child(4){grid-column:1/-1}.explorer-filters .check-label{grid-column:auto}.masthead-actions .badge{max-width:84px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.locale-control select{max-width:none;min-width:105px}.masthead{flex-wrap:wrap;gap:12px}.masthead-actions{flex-wrap:wrap}.app-nav{gap:4px}.app-nav button{padding:8px 10px}}
 
-.narration-span{font-style:italic;color:inherit}.narration-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.narration-toolbar button{min-height:48px;padding:10px 14px;font-size:.85rem;border:1px solid var(--border);color:var(--ink)}
+.narration-span{font-style:italic;color:#c3cac5}.narration-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.narration-toolbar button{min-height:48px;padding:10px 14px;font-size:.85rem;border:1px solid var(--border);color:var(--ink)}
 .composer-footer>.primary{white-space:nowrap;flex-shrink:0}.composer-footer>.hint{min-width:0}
+
+.persona-tools{display:flex;flex-wrap:wrap;gap:12px;margin:24px 0}.persona-tools label{flex:1;min-width:180px;margin:0}.persona-grid{margin-top:24px}.persona-grid .character-open{width:100%}.persona-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.persona-form-grid label{margin:0;min-width:0}.persona-detail-cover{max-height:380px;object-fit:cover;width:100%;border-radius:16px}.item-preview{max-height:45vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}.app-nav{flex-wrap:wrap}.persona-form-hint{margin:12px 0}.persona-actions{margin-bottom:24px}
+@media(max-width:580px){.persona-form-grid{grid-template-columns:1fr}.persona-tools{display:grid;grid-template-columns:minmax(0,1fr)}.persona-tools label{min-width:0}.section-heading{flex-wrap:wrap;gap:16px}}
+
+@media(max-width:580px){.app-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.app-nav button{width:100%}.persona-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.persona-actions>button:nth-child(2){grid-column:auto}.persona-actions>.primary{grid-column:1/-1}}

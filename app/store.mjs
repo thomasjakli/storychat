@@ -14,6 +14,13 @@ function error(code, message) { return Object.assign(new Error(message), { code 
 function check(condition, message = 'Invalid story data.') { if (!condition) throw error('invalid', message); }
 function text(value, max = 2000) { check(typeof value === 'string' && value.trim().length > 0 && value.length <= max); return value.trim(); }
 function object(value, keys, required = keys) { check(value && typeof value === 'object' && !Array.isArray(value)); check(Object.keys(value).every(key => keys.includes(key)) && required.every(key => Object.hasOwn(value, key))); }
+export const personaFields = ['cover','focalPoint','likes','dislikes','age','gender'];
+export const personaDefaults = {cover:'',focalPoint:{x:0.5,y:0.5},likes:'',dislikes:'',age:null,gender:'unspecified'};
+export function validatePersonaFields(data) {
+  for(const key of ['likes','dislikes'])if(data[key]!==undefined)check(typeof data[key]==='string'&&data[key].length<=2000);
+  if(data.age!==undefined)check(data.age===null||(Number.isSafeInteger(data.age)&&data.age>=0&&data.age<=10000));
+  validateCharacterFields(Object.fromEntries(['cover','focalPoint','gender'].filter(k=>data[k]!==undefined).map(k=>[k,data[k]])));
+}
 export const characterFields = ['opening','subtitle','intro','gender','pronouns','category','tags','origin','cover','focalPoint'];
 export function validateCharacterFields(data) {
   const optional = (key,max) => { if (data[key] !== undefined) check(typeof data[key] === 'string' && data[key].length <= max); };
@@ -86,7 +93,7 @@ export class Store {
     const brief=record=>Object.fromEntries(['id','name','subtitle','cover','focalPoint','version','archived','draft','favorite'].filter(k=>Object.hasOwn(record,k)).map(k=>[k,copy(record[k])]));
     const rows=this.db.prepare('SELECT type,data FROM library').all();
     const characters=rows.filter(r=>r.type==='character').map(r=>this.definition(JSON.parse(r.data).id,'character'));
-    const personas=rows.filter(r=>r.type==='persona').map(r=>JSON.parse(r.data));
+    const personas=rows.filter(r=>r.type==='persona').map(r=>this.definition(JSON.parse(r.data).id,'persona'));
     const stories=this.db.prepare('SELECT data FROM stories').all().map(r=>{const story=JSON.parse(r.data);return {id:story.id,title:story.title,character:summary?brief(story.character):story.character,persona:summary?brief(story.persona):story.persona,revision:story.revision};});
     return {characters:summary?characters.map(brief):characters,personas:summary?personas.map(brief):personas,stories};
   }
@@ -94,25 +101,26 @@ export class Store {
   preferences(recordId) { const row=this.db.prepare('SELECT data FROM character_preferences WHERE id=?').get(recordId);return row?JSON.parse(row.data):{}; }
   createDefinition(type, data) {
     check(['character','persona'].includes(type));
-    object(data,['name','definition',...(type==='character'?[...characterFields,'draft','favorite']:[])],['name','definition']);
+    object(data,['name','definition',...(type==='character'?[...characterFields,'draft','favorite']:personaFields)],['name','definition']);
     const draft=data.draft===true;
     check(data.draft===undefined||typeof data.draft==='boolean');check(data.favorite===undefined||typeof data.favorite==='boolean');
     const record={id:id(),name:text(data.name,100),definition:draft&&data.definition===''?'':text(data.definition,8000),version:1,createdAt:now()};
     if(type==='character'){validateCharacterFields(data);Object.assign(record,copy(characterDefaults));for(const key of characterFields)if(data[key]!==undefined)record[key]=copy(data[key]);record.tags=record.tags.filter((t,i,a)=>a.findIndex(other=>searchable(other)===searchable(t))===i).map(t=>t.trim());}
+    if(type==='persona'){validatePersonaFields(data);Object.assign(record,copy(personaDefaults));for(const key of personaFields)if(data[key]!==undefined)record[key]=copy(data[key]);}
     this.transaction(()=>{this.db.prepare('INSERT INTO library(id,type,data) VALUES(?,?,?)').run(record.id,type,JSON.stringify(record));if(type==='character')this.db.prepare('INSERT INTO character_preferences VALUES(?,?)').run(record.id,JSON.stringify({draft,favorite:data.favorite??false,archived:false}));});
     return this.definition(record.id,type);
   }
   createCharacter(data) { return this.createDefinition('character',data); }
   createPersona(data) { return this.createDefinition('persona',data); }
   updateDefinition(type,recordId,changes) {
-    check(['character','persona'].includes(type));object(changes,['name','definition','archived',...(type==='character'?[...characterFields,'draft','favorite']:[])],[]);check(Object.keys(changes).length>0);
+    check(['character','persona'].includes(type));object(changes,['name','definition','archived',...(type==='character'?[...characterFields,'draft','favorite']:personaFields)],[]);check(Object.keys(changes).length>0);
     return this.transaction(()=>{const current=this.definition(recordId,type),record=copy(current);for(const key of ['favorite','draft','archived'])delete record[key];
       const prefs={archived:current.archived??false,favorite:current.favorite??false,draft:current.draft??false};
       for(const key of ['favorite','draft','archived'])if(Object.hasOwn(changes,key)){check(typeof changes[key]==='boolean');prefs[key]=changes[key];}
-      if(type==='character')validateCharacterFields(changes);
+      if(type==='character')validateCharacterFields(changes);else validatePersonaFields(changes);
       if(Object.hasOwn(changes,'name'))record.name=text(changes.name,100);
       if(Object.hasOwn(changes,'definition'))record.definition=prefs.draft&&changes.definition===''?'':text(changes.definition,8000);
-      for(const key of characterFields)if(Object.hasOwn(changes,key))record[key]=copy(changes[key]);
+      for(const key of (type==='character'?characterFields:personaFields))if(Object.hasOwn(changes,key))record[key]=copy(changes[key]);
       if(type==='character'){record.tags=record.tags.filter((t,i,a)=>a.findIndex(other=>searchable(other)===searchable(t))===i).map(t=>t.trim());check(prefs.draft||record.definition.trim().length>0,'A ready character needs a definition.');}
       const oldContent=copy(current);for(const key of ['favorite','draft','archived'])delete oldContent[key];
       if(JSON.stringify(record)!==JSON.stringify(oldContent)){record.version++;record.updatedAt=now();}
@@ -122,10 +130,10 @@ export class Store {
       return this.definition(recordId,type);
     });
   }
-  duplicateDefinition(type,recordId) {const source=this.definition(recordId,type);return this.createDefinition(type,{name:source.name,definition:source.definition,...(type==='character'?Object.fromEntries([...characterFields,'draft'].map(k=>[k,source[k]])): {})});}
+  duplicateDefinition(type,recordId) {const source=this.definition(recordId,type);return this.createDefinition(type,{name:source.name,definition:source.definition,...(type==='character'?Object.fromEntries([...characterFields,'draft'].map(k=>[k,source[k]])):Object.fromEntries(personaFields.map(k=>[k,source[k]])))});}
   archiveDefinition(type,recordId,archived) {return this.updateDefinition(type,recordId,{archived});}
   deleteDefinition(type,recordId) {return this.transaction(()=>{this.definition(recordId,type);this.db.prepare('DELETE FROM library WHERE id=? AND type=?').run(recordId,type);this.db.prepare('DELETE FROM character_preferences WHERE id=?').run(recordId);});}
-  definition(recordId,type) {const row=this.db.prepare('SELECT data FROM library WHERE id=? AND type=?').get(recordId,type);if(!row)throw error('not_found','Definition not found.');const record=JSON.parse(row.data);return type==='character'?{...copy(characterDefaults),...record,favorite:false,draft:false,...this.preferences(recordId)}:record;}
+  definition(recordId,type) {const row=this.db.prepare('SELECT data FROM library WHERE id=? AND type=?').get(recordId,type);if(!row)throw error('not_found','Definition not found.');const record=JSON.parse(row.data);return type==='character'?{...copy(characterDefaults),...record,favorite:false,draft:false,...this.preferences(recordId)}:{...copy(personaDefaults),...record};}
   queryCharacters({q='',category='',tag='',favorites=false,archived='active',gender='',sort='recent',offset=0,limit=24}={}) {
     check([q,category,tag,gender].every(v=>typeof v==='string'&&v.length<=200)&&typeof favorites==='boolean');check(['active','archived','all'].includes(archived)&&['recent','name','used'].includes(sort));check(Number.isSafeInteger(offset)&&offset>=0&&Number.isSafeInteger(limit)&&limit>0&&limit<=100);
     const stories=this.db.prepare('SELECT data FROM stories').all().map(r=>JSON.parse(r.data));
