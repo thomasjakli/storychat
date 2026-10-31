@@ -55,8 +55,13 @@ export function createApplication({store, provider, password, origin, secureCook
     try {
       const url = new URL(req.url,'http://localhost'), path = url.pathname;
       const expectedOrigin = origin || `http://${server.address().address === '::1' ? '[::1]' : '127.0.0.1'}:${server.address().port}`;
-      // Reject Host rebinding, cross-origin writes, and cross-site browser requests.
-      if (req.headers.host !== new URL(expectedOrigin).host || (req.headers.origin && req.headers.origin !== expectedOrigin) || req.headers['sec-fetch-site'] === 'cross-site') return send(res,403,{error:{code:'forbidden',message:'Use the configured application origin.'}});
+      // Installed-app launches and external links can be cross-site top-level
+      // navigations. Permit only the public application shell in that context;
+      // APIs, assets, framed documents and every mutation retain the strict rule.
+      const shellNavigation = req.method === 'GET' && ['/', '/index.html'].includes(path)
+        && req.headers['sec-fetch-mode'] === 'navigate' && req.headers['sec-fetch-dest'] === 'document';
+      if (req.headers.host !== new URL(expectedOrigin).host || (req.headers.origin && req.headers.origin !== expectedOrigin)
+        || (req.headers['sec-fetch-site'] === 'cross-site' && !shellNavigation)) return send(res,403,{error:{code:'forbidden',message:'Use the configured application origin.'}});
       if (req.method === 'GET' && path === '/health') return send(res,200,{status:'ok'});
       const token = /(?:^|;\s*)storychat=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie || '')?.[1];
       const authenticated = !!token && sessions.get(token) > Date.now();
