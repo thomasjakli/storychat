@@ -1,6 +1,6 @@
 # Chronological fictional inner thoughts
 
-Status: implemented, local verification passed; rendered review and publication in progress, 2026-10-31. Extends narration without changing its existing star convention.
+Status: implemented, local/Linux/container verification and rendered review passed; published, 2026-10-31. Extends narration without changing its existing star convention.
 
 ## Confirmed scope
 

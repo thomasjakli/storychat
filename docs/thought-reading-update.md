@@ -1,6 +1,6 @@
 # Thought blocks and reading controls: release guide
 
-Implemented and reviewed; publication in progress, no production rollout. Real Android and live thought quality are owner acceptance, not inferred from synthetic tests.
+Implemented, reviewed and published; no production rollout. Real Android and live thought quality are owner acceptance, not inferred from synthetic tests.
 
 ## Backup and upgrade
 
@@ -43,3 +43,14 @@ Windows integrated checks93passed/2Linux-only skips and adapter61passed/1Linux-o
 Synthetic browser review:360px English default/150%,390px German85%/150%,1280px English default/German85%; independent reviewer additionally viewed390px English150% and360px German150%. Checked separated narration, user/assistant bodies, typed thought panels/actions and long labels. Measured message16px to24px while composer15.2px, navigation16px and labels10.4px remained unchanged. No overflow blocker identified in inspected views. Font controls are in Settings; direct in-chat reading-anchor behavior is not established by these screenshots. Source handling of blocked/corrupt storage is defensive but not real-browser failure-injection evidence.
 
 Coordinator also viewed actual synthetic delayed loading/cancel and failed-generation states in German; no partial block was inserted. Removed redundant native confirmation before explicit generation and corrected ordinary reply-status messaging during thought requests. Browser reload retained150% reading preference, verified in Settings. Native screen-reader/device checks remain pending.
+
+## Published release
+
+[Implementation64e56be](https://github.com/thomasjakli/storychat/commit/64e56bea1a613b3cf0293aa5e8767c0b2e309d04). [Workflow success](https://github.com/thomasjakli/storychat/actions/runs/41242185689): Linux95/95 application and62/62 adapter checks, no skips, plus both verify and publish-candidate container lifecycle/recovery runs passed. No live inference.
+
+```text
+ghcr.io/thomasjakli/storychat:latest
+ghcr.io/thomasjakli/storychat@sha256:60285177b83558d3eb630db0c5f2796f0c7e808959052730e91b1bcbe4556356
+```
+
+Independently verifiable release checks pass. Real Android, screen-reader behavior, storage-failure injection and live-model quality remain explicit follow-up. No production deployment performed.

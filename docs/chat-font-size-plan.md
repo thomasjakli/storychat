@@ -1,6 +1,6 @@
 # Device-local chat font size
 
-Status: implemented, local verification passed; rendered review and publication in progress, 2026-10-31.
+Status: implemented, local/Linux/container verification and rendered review passed; published, 2026-10-31.
 
 ## Confirmed behavior
 
