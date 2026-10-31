@@ -22,3 +22,5 @@ Object.assign(german,{
 });
 
 Object.assign(german,{'Image storage':'Bildspeicher','Refresh storage usage':'Speicherbelegung aktualisieren','Delete unused images':'Unbenutzte Bilder löschen','Storage used':'Speicher belegt','Images':'Bilder','Unused images':'Unbenutzte Bilder','Delete all unused uploaded images? Images retained by characters or stories will be preserved.':'Alle unbenutzten hochgeladenen Bilder löschen? Von Charakteren oder Geschichten verwendete Bilder bleiben erhalten.','Unused images removed.':'Unbenutzte Bilder entfernt.','Image is still in use.':'Das Bild wird noch verwendet.'});
+
+Object.assign(german,{'Mark as narration':'Als Erzähltext markieren','Not enough space to add narration markers.':'Nicht genug Platz für die Erzähltext-Markierungen.'});

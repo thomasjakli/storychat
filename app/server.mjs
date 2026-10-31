@@ -75,6 +75,19 @@ export function createApplication({store, provider, password, origin, secureCook
         if (sessions.size >= 20) sessions.delete(sessions.keys().next().value);
         const id=randomBytes(32).toString('hex'); sessions.set(id,Date.now()+28800000); res.setHeader('Set-Cookie',cookie(id)); return send(res,200,{authenticated:true});
       }
+      if(path.startsWith('/speech-spike') || path.startsWith('/speech-assets/')) {
+        if(!authenticated)return send(res,401,{error:{code:'unauthorized',message:'Sign in to Storychat first.'}});
+        if(req.method!=='GET')return send(res,405,{error:{code:'invalid',message:'Read only.'}});
+        const pages=['index.html','app.js','style.css','worker.js','capture.js','assets.json','TRANSFORMERS-LICENSE.txt','WHISPER-LICENSE.txt'];
+        const name=path==='/speech-spike/'||path==='/speech-spike'?'index.html':path.slice('/speech-spike/'.length);
+        let file;
+        if(path.startsWith('/speech-assets/')){const manifest=JSON.parse(await readFile(resolve(root,'speech-spike/assets.json'),'utf8'));const asset=path.slice('/speech-assets/'.length);if(!manifest.files.some(f=>f.path===asset))throw fail('not_found','Unknown speech asset.');file=resolve(process.env.STORYCHAT_SPEECH_ASSETS || resolve(root,'data/speech-assets'),asset);}
+        else {if(!pages.includes(name))throw fail('not_found','Unknown speech page.');file=resolve(root,'speech-spike',name);}
+        res.setHeader('Content-Security-Policy',"default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self'; worker-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'");
+        const mime={html:'text/html; charset=utf-8',js:'text/javascript',mjs:'text/javascript',css:'text/css',json:'application/json',wasm:'application/wasm'};
+        let bytes;try{bytes=await readFile(file);}catch{throw fail('not_found','Speech assets not prepared.');}
+        res.writeHead(200,{'Content-Type':mime[file.split('.').pop()]||'application/octet-stream'});return res.end(bytes);
+      }
       if (path.startsWith('/api/')) {
         if (!authenticated) return send(res,401,{error:{code:'unauthorized',message:'Owner sign-in required.'}});
       if(req.method!=='GET' || req.url?.split('?')[0]==='/api/export') {
@@ -160,7 +173,7 @@ export function createApplication({store, provider, password, origin, secureCook
         }
         return send(res,405,{error:{code:'invalid',message:'Method not supported.'}});
       }
-      const files = {'/':'index.html','/index.html':'index.html','/explorer.js':'explorer.js','/i18n.js':'i18n.js','/app.js':'app.js','/style.css':'style.css','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest','/icon.svg':'icon.svg','/icon-192.png':'icon-192.png','/icon-512.png':'icon-512.png','/icon-maskable-512.png':'icon-maskable-512.png'};
+      const files = {'/':'index.html','/index.html':'index.html','/narration.js':'narration.js','/explorer.js':'explorer.js','/i18n.js':'i18n.js','/app.js':'app.js','/style.css':'style.css','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest','/icon.svg':'icon.svg','/icon-192.png':'icon-192.png','/icon-512.png':'icon-512.png','/icon-maskable-512.png':'icon-maskable-512.png'};
       if (req.method !== 'GET' || !files[path]) return send(res,404,{error:{code:'not_found',message:'Not found.'}});
       const extension=files[path].split('.').pop();
       const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json',png:'image/png',svg:'image/svg+xml'};

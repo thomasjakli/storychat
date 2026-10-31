@@ -160,7 +160,7 @@ function renderMessages() {
   for (const message of (state.story.messages || []).filter(item => !item.superseded)) {
     const article = el('article', 'message' + (message.role === 'user' ? ' user' : message.kind === 'intro' || message.type === 'intro' ? ' intro' : ''));
     article.id = 'message-' + message.id;
-    article.append(contentEl('p', 'message-label', message.kind === 'intro' || message.type === 'intro' ? t('Intro') : message.role === 'user' ? (state.story.persona?.name || t('You')) : state.story.character?.name || t('Character')), contentEl('div', 'message-text', message.text));
+    article.append(contentEl('p', 'message-label', message.kind === 'intro' || message.type === 'intro' ? t('Intro') : message.role === 'user' ? (state.story.persona?.name || t('You')) : state.story.character?.name || t('Character')), StoryNarration.render(contentEl('div', 'message-text'), message.text));
     $('messages').append(article);
   }
   if (!$('messages').children.length) $('messages').append(el('p', 'empty-state', 'The scene is yours to begin. Write the first moment below.'));
@@ -466,3 +466,6 @@ $('install-help').addEventListener('click',()=>$('install-dialog').showModal());
 $('close-install').addEventListener('click',()=>$('install-dialog').close());
 $('install-now').addEventListener('click',async()=>{if(!installPrompt)return;await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('install-now').hidden=true;});
 window.visualViewport?.addEventListener('resize',()=>{document.documentElement.style.setProperty('--visible-height',window.visualViewport.height+'px');});
+
+StoryNarration.attach($('message'),$('mark-narration'),()=>showNotice('Not enough space to add narration markers.',true));
+StoryNarration.attach($('replace-text'),$('mark-replacement-narration'),()=>showNotice('Not enough space to add narration markers.',true));
