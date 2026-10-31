@@ -155,3 +155,7 @@ When delegation is authorized:
 5. Review integrated behavior before declaring a milestone complete. Do not overwrite another agent's or the user's work to resolve overlap.
 
 Use subagents for subtasks within this project when authorized. Create separate user-visible chats only when the user explicitly requests them.
+
+## Visual release review
+
+For changes to visible screens, inspect rendered screenshots before publishing at 360px and 390px widths in both English and German, plus a desktop width. Review alignment, wrapping/overflow, active/disabled button contrast, touch targets, and long labels. Source/DOM tests alone do not satisfy this visual gate. Record what was actually viewed and keep real Android verification separate. User-reported defects must become explicit review scenarios.

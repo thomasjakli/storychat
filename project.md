@@ -362,3 +362,5 @@ Release verification (2026-10-31): commit `8f050a51bb6004e56232399d32a6df3c67983
 `ghcr.io/thomasjakli/storychat@sha256:258fe0ce2aaffd92adb5fbca4e758f7043ca631329ba047f85b0c0c09d32ac0c`
 
 [Workflow evidence](https://github.com/thomasjakli/storychat/actions/runs/41146920415). [Upgrade, rollback and Android acceptance](docs/character-update-verification.md). Stage 4A device acceptance remains pending; running deployment was not modified.
+
+Mobile visual correction (2026-10-31): owner reported misaligned explorer filters and low-contrast new-story action. Removed filter counters, replaced flex wrapping with an aligned responsive grid/full-width search and sort, and separated character actions from memory-action CSS (dark primary text, larger touch targets, stacked primary actions). Rendered synthetic preview screenshots reviewed at 360px/390px in English/German and desktop1280 German. This is browser viewport evidence, not Android device acceptance. AGENTS.md now requires a rendered bilingual mobile visual gate before visible UI releases.
