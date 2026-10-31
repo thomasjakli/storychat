@@ -22,3 +22,5 @@ Report results separately for Firefox EN/DE and Chrome EN/DE. Until both pass, c
 
 
 Desktop feasibility evidence (2026-10-31): original synthetic English SAPI fixture transcribed exactly as “The blue lantern is beside the window. Please open the garden gate.” Pinned WASM model loaded1233ms, first transcription2128ms. With the preview server then stopped, the already-loaded engine produced the same transcript in1485ms. This establishes warm inference without that server; it is not a comprehensive network audit, fresh offline app startup, real microphone test or Android/German acceptance. Audio fixture and screenshot evidence stay in ignored analysis/data.
+
+Published tested image: `ghcr.io/thomasjakli/storychat@sha256:a7f5b41659997a731bd513f6f4b48d558b1a91e6ea9e1cee165a1528e901e8da` (also latest / sha-6324d06c365f2f516e427e47211c9418feb2bd0c). Linux75/75 app and62/62 adapter checks pass plus both container smoke gates. [Workflow](https://github.com/thomasjakli/storychat/actions/runs/41183120624). Device acceptance remains pending; see speech-spike/README.md for prototype steps.
