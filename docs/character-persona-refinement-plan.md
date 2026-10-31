@@ -1,6 +1,6 @@
 # Character consistency, personas, narration and item transfer
 
-Status: implemented and independently tested on Windows, 2026-10-31; Linux/container publication and rendered visual review in progress. Real Android acceptance and live model quality remain owner checks. See refinement-update.md for operational instructions.
+Status: implemented, independently tested and published, 2026-10-31. Linux85/85 application and62/62 adapter checks plus both container gates passed; rendered EN/DE mobile/desktop review completed. Real Android acceptance and live model quality remain owner checks. See refinement-update.md for operational instructions.
 
 ## Change 1: Character behavior and writing preferences
 

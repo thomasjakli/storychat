@@ -1,6 +1,6 @@
 # Persona and character refinement update
 
-Implemented; local automated and rendered review passed. Linux/container release verification in progress. Device acceptance remains pending; no production deployment performed.
+Implemented, reviewed and published. Linux/container verification passed. Device acceptance remains pending; no production deployment performed.
 
 ## Backup and upgrade
 
@@ -35,8 +35,19 @@ No live provider evaluation is implied by deterministic tests. Native StoryChat 
 
 ## Automated evidence
 
-Independent Windows Node24 checks: application83 passed,2 Linux-only skipped; adapter61 passed,1 Linux-only skipped. Synthetic coverage includes persona defaults/age zero, old transfers, immutable snapshots, fresh item/media identities, invalid preview without writes, forced import rollback, retained picture references and isolated offline backup/restore. QA found and fixed stale asynchronous editor/import completion races. No live inference used. Linux/container evidence will be recorded after CI.
+Independent Windows Node24 checks: application83 passed,2 Linux-only skipped; adapter61 passed,1 Linux-only skipped. Synthetic coverage includes persona defaults/age zero, old transfers, immutable snapshots, fresh item/media identities, invalid preview without writes, forced import rollback, retained picture references and isolated offline backup/restore. QA found and fixed stale asynchronous editor/import completion races. No live inference used. Linux CI passed85/85 application and62/62 adapter tests without skips; both verification and publish-candidate container lifecycle/recovery checks passed.
 
 ## Rendered visual review
 
 Inspected synthetic browser screenshots in English/German at360px and390px, plus1280px desktop. Covered persona library/detail/editor top and bottom, mobile character filter regressions, primary-action contrast, narration on message surfaces and English360px import preview. Review prompted two-column mobile navigation and compact accessible editor-close fixes. No clipping issue remained in the inspected views. Screenshots were viewed through browser tools; this is viewport evidence, not real Android acceptance. Filechooser automation was slow, but a valid synthetic item reached the preview. German import-preview end-to-end device checking remains in owner acceptance.
+
+## Published release
+
+Implementation: [297de63](https://github.com/thomasjakli/storychat/commit/297de632f1fa7b6369678d6975a2ef20d67dc927). [Successful workflow](https://github.com/thomasjakli/storychat/actions/runs/41218647434).
+
+```text
+ghcr.io/thomasjakli/storychat:latest
+ghcr.io/thomasjakli/storychat@sha256:8a6938fcd0e0442eeb95291299178f6d8be5b28a5ee21c4c63d2b3340e200847
+```
+
+No production rollout performed. All independently verifiable release checks passed; Android/manual acceptance and variable live-model quality remain owner follow-up.
