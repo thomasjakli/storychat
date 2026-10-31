@@ -160,10 +160,10 @@ export function createApplication({store, provider, password, origin, secureCook
         }
         return send(res,405,{error:{code:'invalid',message:'Method not supported.'}});
       }
-      const files = {'/':'index.html','/index.html':'index.html','/explorer.js':'explorer.js','/i18n.js':'i18n.js','/app.js':'app.js','/style.css':'style.css','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest','/icon.svg':'icon.svg'};
+      const files = {'/':'index.html','/index.html':'index.html','/explorer.js':'explorer.js','/i18n.js':'i18n.js','/app.js':'app.js','/style.css':'style.css','/styles.css':'styles.css','/manifest.webmanifest':'manifest.webmanifest','/icon.svg':'icon.svg','/icon-192.png':'icon-192.png','/icon-512.png':'icon-512.png','/icon-maskable-512.png':'icon-maskable-512.png'};
       if (req.method !== 'GET' || !files[path]) return send(res,404,{error:{code:'not_found',message:'Not found.'}});
       const extension=files[path].split('.').pop();
-      const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json',svg:'image/svg+xml'};
+      const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json',png:'image/png',svg:'image/svg+xml'};
       const bytes=await readFile(resolve(root,'public',files[path])); res.writeHead(200,{'Content-Type':types[extension]}); res.end(bytes);
     } catch(error) { if (!res.headersSent) send(res,error.code === 'not_found' ? 404 : error.code === 'conflict' ? 409 : error.code === 'invalid' ? 400 : 500,{error:publicFailure(error)}); else res.end(); } finally {releaseMutation?.();}
   });
