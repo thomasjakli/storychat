@@ -44,12 +44,12 @@ test('persistent snapshots, evidence, relationships and fictional time survive r
   assert.match(resumed.thoughts[0].text, /Fictional inner thought/);
 });
 
-test('recall uses durable state after evidence leaves six-message recent window', t => {
+test('recall uses durable state after evidence leaves bounded recent window', t => {
   const f = fixture(t);
   const original = turn(f, 'I prefer mint tea.', source => ({ ...empty(), memories: [memory(source)] })).attempt.generation.userMessageId;
   for (let n = 0; n < 6; n++) turn(f, `We discuss constellation number ${n}.`);
   const { context } = f.store.beginTurn(f.story.id, { requestId: 'recall', text: 'What tea should we prepare?' });
-  assert.equal(context.messages.length, 6);
+  assert.equal(context.messages.length, 12);
   assert.ok(!context.messages.some(message => message.id === original));
   assert.equal(context.memories.find(m => m.key === 'tea').text, 'Rowan prefers mint tea.');
   assert.ok(context.sourceIds.includes(original));

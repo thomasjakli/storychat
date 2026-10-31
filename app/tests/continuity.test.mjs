@@ -49,7 +49,7 @@ test('QA: durable source-linked continuity survives a separate process after tra
      console.log(JSON.stringify({state,context})); store.close();`, f.path, f.story.id], { encoding: 'utf8', windowsHide: true });
   assert.equal(child.status, 0, child.stderr);
   const resumed = JSON.parse(child.stdout);
-  assert.equal(resumed.context.messages.length, 6);
+  assert.equal(resumed.context.messages.length, 12);
   assert.ok(!resumed.context.messages.some(message => message.id === evidence));
   assert.ok(resumed.context.sourceIds.includes(evidence));
   assert.match(resumed.context.summary, /Harbor Lane/);

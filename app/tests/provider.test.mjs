@@ -122,3 +122,16 @@ test('oversized context is refused before an inference request', async () => {
  assert.deepEqual(await provider.generateThought(context()),{text:'I am curious about the map.',sources:['u1']});assert.equal(calls,1);await provider.close();
  const fake=await createProvider({mode:'fake'});assert.match((await fake.generateThought(context())).text,/FAKE DEMO/);await fake.close();
 });
+
+// Contract evidence only: a fake transport cannot establish writing quality.
+test('ordinary generation carries reserved reply evidence without changing dedicated thought scope',async()=>{
+ const vault=vaultFixture();let calls=0;
+ const provider=await createProvider({accountId:'owner',model:'selected',vault,fetcher:async(url,options)=>{
+  if(url.endsWith('/models'))return catalog();calls++;const b=JSON.parse(options.body),c=JSON.parse(b.input[0].content);
+  assert.equal(c.replySourceId,'reserved-assistant');assert.ok(c.sourceIds.includes('reserved-assistant'));
+  assert.match(b.instructions,/create the next part of the story/);assert.match(b.instructions,/New state based on a development authored in this reply must cite replySourceId/);
+  const output=envelope();output.reply='The cartographer unfolds a second map.';output.memories=[{kind:'event',key:'map.unfolded',text:'The cartographer unfolds a second map.',sources:['reserved-assistant']}];return streamed(output);
+ }});
+ const c={...context(),replySourceId:'reserved-assistant',sourceIds:['u1','reserved-assistant']};
+ const result=await provider.generate(c);assert.deepEqual(result.memories[0].sources,['reserved-assistant']);assert.equal(calls,1);await provider.close();
+});

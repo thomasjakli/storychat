@@ -25,21 +25,23 @@ function story(v) {
     check(Array.isArray(v.generations)&&v.generations.length<=10000);
   const generationIds=new Set(v.generations.map(g=>g.id));check(generationIds.size===v.generations.length);
   for(const g of v.generations){
-    object(g,['id','requestId','userMessageId','status','revision','createdAt','completedAt','error','context','baseSnapshot','replaces','replacementFingerprint'],['id','requestId','userMessageId','status','revision','createdAt']);
-    identifier(g.id);text(g.requestId,100);check(ids.has(g.userMessageId));check(['completed','failed','interrupted','superseded'].includes(g.status));check(Number.isSafeInteger(g.revision)&&g.revision>=0);text(g.createdAt,100);if(g.completedAt!==undefined)text(g.completedAt,100);if(g.error!==undefined)text(g.error,100);if(g.replaces!==undefined)check(generationIds.has(g.replaces));if(g.replacementFingerprint!==undefined)text(g.replacementFingerprint,9000);
+    object(g,['id','requestId','userMessageId','assistantMessageId','status','revision','createdAt','completedAt','error','context','baseSnapshot','replaces','replacementFingerprint'],['id','requestId','userMessageId','status','revision','createdAt']);
+    identifier(g.id);if(g.assistantMessageId!==undefined){identifier(g.assistantMessageId);const reserved=v.messages.find(m=>m.id===g.assistantMessageId);check(!reserved||(reserved.role==='assistant'&&reserved.kind===undefined&&reserved.generationId===g.id));if(g.status==='completed')check(!!reserved);check(!v.generations.some(other=>other!==g&&other.assistantMessageId===g.assistantMessageId));}text(g.requestId,100);check(ids.has(g.userMessageId));check(['completed','failed','interrupted','superseded'].includes(g.status));check(Number.isSafeInteger(g.revision)&&g.revision>=0);text(g.createdAt,100);if(g.completedAt!==undefined)text(g.completedAt,100);if(g.error!==undefined)text(g.error,100);if(g.replaces!==undefined)check(generationIds.has(g.replaces));if(g.replacementFingerprint!==undefined)text(g.replacementFingerprint,9000);
     if(g.baseSnapshot){object(g.baseSnapshot,['scene','memories','threads','relationship','thoughts','summary']);story({...v,...g.baseSnapshot,generations:[],thoughtRequests:[]});}
     if(g.context){
-      object(g.context,['character','persona','controls','revision','scene','memories','threads','relationship','thoughts','summary','messages','suppression','instructions','sourceIds']);
-      text(g.context.instructions,4000);check(Array.isArray(g.context.sourceIds)&&g.context.sourceIds.length<=5000&&g.context.sourceIds.every(s=>ids.has(s)));
-      const {instructions,sourceIds,...contextState}=g.context; story({...v,...contextState,id:v.id,title:v.title,messages:v.messages,generations:[],thoughtRequests:[]});
-      check(Array.isArray(g.context.messages)&&g.context.messages.length<=6&&g.context.messages.every(m=>ids.has(m.id))); for(const m of g.context.messages){const retained=v.messages.find(x=>x.id===m.id);check(retained&&['role','text','createdAt','generationId'].every(k=>retained[k]===m[k]));object(m,['id','role','text','createdAt','generationId','superseded','kind','sources','origin','provenance'],['id','role','text','createdAt']);text(m.text,12000);check(['user','assistant'].includes(m.role));text(m.createdAt,100);if(m.kind!==undefined)check(['intro','opening','thought'].includes(m.kind)&&m.role==='assistant');if(m.generationId!==undefined)identifier(m.generationId);if(m.superseded!==undefined)check(typeof m.superseded==='boolean');}
+      object(g.context,['character','persona','controls','revision','scene','memories','threads','relationship','thoughts','summary','messages','suppression','instructions','sourceIds','replySourceId'],['character','persona','controls','revision','scene','memories','threads','relationship','thoughts','summary','messages','suppression','instructions','sourceIds']);
+      if(g.context.replySourceId!==undefined)check(g.assistantMessageId!==undefined&&g.context.replySourceId===g.assistantMessageId);
+      if(g.assistantMessageId!==undefined)check(g.context.replySourceId===g.assistantMessageId&&g.context.sourceIds.includes(g.assistantMessageId));
+      validateContext(g.context,v,ids,g.assistantMessageId);
     }
   }
 }
-function validateContext(c,v,ids){
-  text(c.instructions,4000);check(Array.isArray(c.messages)&&c.messages.length<=6);check(Array.isArray(c.sourceIds)&&c.sourceIds.length<=5000&&c.sourceIds.every(id=>ids.has(id)));
-  const {instructions,sourceIds,...state}=c;story({...v,...state,messages:v.messages,generations:[],thoughtRequests:[]});
-  for(const m of c.messages){const retained=v.messages.find(x=>x.id===m.id);check(retained&&m.kind!=='thought'&&['role','text','createdAt','generationId','kind','sources','origin','provenance'].every(k=>JSON.stringify(m[k])===JSON.stringify(retained[k])));}
+function validateContext(c,v,ids,reservedId){
+  text(c.instructions,4000);check(Array.isArray(c.messages)&&c.messages.length<=12);check(Array.isArray(c.sourceIds)&&c.sourceIds.length<=5000&&c.sourceIds.every(id=>(ids.has(id)&&v.messages.find(m=>m.id===id)?.kind!=='thought')||id===reservedId));
+  const {instructions,sourceIds,replySourceId,...state}=c;story({...v,...state,messages:v.messages,generations:[],thoughtRequests:[]});
+  // Legacy six-message contexts could exceed the new budget; preserve historical backups.
+  check(c.messages.reduce((n,m)=>n+(typeof m.text==='string'?m.text.length:0),0)<=(c.replySourceId!==undefined||c.messages.length>6?24000:72000));
+  for(const m of c.messages){object(m,['id','role','text','createdAt','generationId','superseded','kind','sources','origin','provenance'],['id','role','text','createdAt']);const retained=v.messages.find(x=>x.id===m.id);check(retained&&m.kind!=='thought'&&['role','text','createdAt','generationId','kind','sources','origin','provenance'].every(k=>JSON.stringify(m[k])===JSON.stringify(retained[k])));}
 }
 export function validateTransfer(value) {
   check(Buffer.byteLength(JSON.stringify(value))<=MAX_TRANSFER_BYTES);object(value,['format','version','library','stories']);check(value.format==='storychat'&&value.version===1);check(Array.isArray(value.library)&&value.library.length<=2000&&Array.isArray(value.stories)&&value.stories.length<=1000);
