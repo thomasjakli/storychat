@@ -2,7 +2,7 @@ name: Verify and publish container
 
 on:
   push:
-    branches: [master]
+    branches: [master, ux/reading-first]
     paths:
       - 'app/**'
       - 'prototype/**'
