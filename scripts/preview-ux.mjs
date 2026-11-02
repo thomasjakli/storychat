@@ -3,7 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';import {resolve} from 'node:pat
 import {acquireRuntimeLock} from '../prototype/runtime-lock.mjs';
 import {Store} from '../app/store.mjs';import {MediaStore} from '../app/media.mjs';import {createApplication} from '../app/server.mjs';import {exportItem} from '../app/item-transfer.mjs';import {exportBundle} from '../app/media-transfer.mjs';
 if(Number(process.versions.node.split('.')[0])<24)throw Error('Node 24 or later required.');
-const root=resolve('data/ux-review'),port=Number(process.env.STORYCHAT_UX_PORT||8796),host='127.0.0.1';
+const root=resolve('data/ux-review'),port=Number(process.env.STORYCHAT_UX_PORT||8796),host=process.env.STORYCHAT_UX_BIND_ADDRESS||'127.0.0.1';
 if(!Number.isSafeInteger(port)||port<1024||port>65535)throw Error('Invalid preview port.');await mkdir(root,{recursive:true});const lock=await acquireRuntimeLock(resolve(root,'preview.sqlite.lock'));const store=new Store(resolve(root,'preview.sqlite')),media=new MediaStore(resolve(root,'media'));await media.init();
 if(!store.library().characters.length){
  const cover=await media.upload(await sharp({create:{width:600,height:800,channels:3,background:'#526b63'}}).composite([{input:Buffer.from('<svg width="600" height="800"><circle cx="300" cy="280" r="160" fill="#e2b48b"/><path d="M80 750Q300 300 520 750" fill="#283b34"/></svg>')}]).png().toBuffer());
@@ -18,6 +18,6 @@ if(!store.library().characters.length){
  await writeFile(resolve(root,'sample-persona.storychat.json'),JSON.stringify(await exportBundle(exportItem(store,'persona',persona.id),media),null,2));
 }
 const provider={name:'fake',model:'synthetic-ux-only',async generate(context){await new Promise(r=>setTimeout(r,1200));const user=[...context.messages].reverse().find(m=>m.role==='user');if(user?.text.includes('[simulate failure]'))throw Object.assign(Error('Synthetic failure'),{code:'provider_unavailable'});return {reply:'FAKE DEMO — *Rowan unfolds a smaller map.* A sheltered path appears beside the wall. We can examine it when you choose.',memories:[],threads:[],relationship:[],thoughts:[],scene:null};},async generateThought(context){await new Promise(r=>setTimeout(r,4000));if(context.messages.some(m=>m.text.includes('[simulate failure]')))throw Object.assign(Error('Synthetic failure'),{code:'provider_unavailable'});return {text:'FAKE DEMO — I should offer a practical choice and give the traveler room to decide.',sources:[context.sourceIds.find(id=>id!==context.replySourceId)]};}};
-const app=createApplication({store,media,provider,password:'synthetic-preview-password'});await new Promise((r,j)=>{app.server.once('error',j);app.server.listen(port,host,r);});
+const app=createApplication({store,media,provider,password:'synthetic-preview-password',origin:`http://${host}:${port}`});await new Promise((r,j)=>{app.server.once('error',j);app.server.listen(port,host,r);});
 console.log(`Synthetic UX preview: http://${host}:${port}/; password: synthetic-preview-password; data: data/ux-review. Fake inference only.`);
 for(const sig of ['SIGINT','SIGTERM'])process.once(sig,()=>app.close().then(async()=>{await lock.release();process.exit(0);}));

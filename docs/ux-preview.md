@@ -16,7 +16,7 @@ Windows PowerShell alternative:
 ./deploy/start-ux-preview.ps1 -NodeExecutable node
 ```
 
-If Node24 is not on PATH, provide its executable path through `-NodeExecutable`. Optional `-Port 8797` changes only the loopback port. The launcher always binds127.0.0.1. It does not configure LAN exposure, reverse proxies, DNS or tunnels.
+If Node24 is not on PATH, provide its executable path through `-NodeExecutable`. Optional `-Port 8797` changes the port. The launcher defaults to127.0.0.1; an explicit `-BindAddress` (or `STORYCHAT_UX_BIND_ADDRESS` for the Node launcher) can select an owner-approved LAN interface for device review. It does not configure firewall rules, reverse proxies, DNS or tunnels. Plain HTTP on a LAN address does not provide secure-context features such as microphone access or installation.
 
 Open http://127.0.0.1:8796/ on the host PC. Login password is `synthetic-preview-password`, deliberately a test-only value. Phone access requires a separately authorized device-accessible route; loopback on a phone is not the PC. No new network route is configured by this launcher.
 
