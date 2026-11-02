@@ -2,6 +2,7 @@
 
 const $ = id => document.getElementById(id);
 const state = { session: null, sessionEpoch: 0, library: null, story: null, view: 'loading', poll: null, busy: false, editingMemory: null, editingDefinition: null, replacing: null, lastSignature: '', sendRequest: null };
+let storyNavigationEpoch=0;
 const activeStatuses = new Set(['pending', 'running', 'streaming']);
 const draftPrefix = 'storychat:draft:';
 
@@ -16,14 +17,32 @@ function button(text, className, onClick) {
   const node = el('button', className, t(text)); node.type = 'button';
   node.addEventListener('click', onClick); return node;
 }
+const editorDraftMemory=new Map();
+function editorDraft(key){const storageKey='storychat:editor:v1:'+key;return {read(){if(editorDraftMemory.has(key))return editorDraftMemory.get(key);try{return JSON.parse(localStorage.getItem(storageKey)||'null');}catch{return null;}},write(value){editorDraftMemory.set(key,value);try{localStorage.setItem(storageKey,JSON.stringify(value));}catch{}},clear(){editorDraftMemory.set(key,null);try{localStorage.removeItem(storageKey);}catch{}}};}
+function actionMenu(label,buttons){const details=el('details','action-menu'),summary=el('summary','',t(label));details.append(summary);const list=el('div','action-menu-list');list.append(...buttons);details.append(list);list.addEventListener('click',event=>{if(event.target.closest('button')){details.open=false;if(list.contains(document.activeElement))summary.focus();}});details.addEventListener('keydown',event=>{if(event.key==='Escape'){details.open=false;summary.focus();}});return details;}
+let dialogSequence=0;
+function nameDialog(dialog,heading){if(!heading.id)heading.id='dialog-heading-'+(++dialogSequence);dialog.setAttribute('aria-labelledby',heading.id);}
+window.StoryUX={actionMenu,draft:editorDraft,nameDialog};
+let restoringReading=false,leavingReading=false;
+if('scrollRestoration' in history)history.scrollRestoration='manual';
+function saveReading(){if(restoringReading||leavingReading||state.view!=='story-view'||!state.story)return;const visible=[...document.querySelectorAll('#messages .message')].find(n=>{const r=n.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight;});if(!visible)return;const value={messageId:visible.id,offset:visible.getBoundingClientRect().top,following:innerHeight+scrollY>=document.documentElement.scrollHeight-160};editorDraft('reading:'+state.story.id).write(value);}
+function scrollToLatest(behavior='auto'){window.scrollTo({top:document.documentElement.scrollHeight,behavior});$('jump-latest').hidden=true;}
+function restoreReading(id){const saved=editorDraft('reading:'+id).read();restoringReading=true;requestAnimationFrame(()=>requestAnimationFrame(()=>{const target=saved?.messageId&&$(saved.messageId);if(state.view==='story-view'&&state.story?.id===id){if(saved?.following||!saved)scrollToLatest();else if(target)window.scrollBy(0,target.getBoundingClientRect().top-saved.offset);}restoringReading=false;}));}
 function showNotice(message, error = false) {
   $('notice').textContent = t(message); $('notice').classList.toggle('error', error); $('notice').hidden = !message;
 }
 function view(name) {
+  const previousView=state.view;
+  if(name!=='story-view')storyNavigationEpoch++;
+  if(state.view==='story-view'&&name!=='story-view')saveDraft();
   state.view = name;
   $('app-nav').hidden = !state.session?.authenticated;
   for (const id of ['loading', 'login-view', 'library-view', 'story-view', 'characters-view', 'character-view', 'personas-view', 'persona-view', 'settings-view']) $(id).hidden = id !== name;
   $('page-footer').hidden = name === 'story-view';
+  const heading=$(name)?.querySelector('h1,h2');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
+  document.body.classList.toggle('reading-story',name==='story-view');
+  if(name!=='story-view'){if(previousView!==name)window.scrollTo(0,0);leavingReading=false;}
+  for(const nav of $('app-nav').querySelectorAll('button')){const active=nav.id==='nav-'+(name.includes('persona')?'personas':name.includes('character')?'characters':name==='settings-view'?'settings':'stories');if(active)nav.setAttribute('aria-current','page');else nav.removeAttribute('aria-current');}
 }
 async function api(path, options = {}) {
   const epoch = state.sessionEpoch;
@@ -85,13 +104,14 @@ async function initialize() {
   } catch (error) { lockView(); showNotice(error.message, true); }
 }
 async function loadLibrary() {
-  stopPolling(); closeInspector();
-  state.library = await api('/api/library?summary=true'); state.story = null; state.lastSignature = '';
+  saveDraft();storyNavigationEpoch++;stopPolling(); closeInspector();
+  const navigation=storyNavigationEpoch,epoch=state.sessionEpoch;const library=await api('/api/library?summary=true');if(navigation!==storyNavigationEpoch||epoch!==state.sessionEpoch)return;state.library=library;state.story=null; state.lastSignature = '';
   renderLibrary(); view('library-view');
 }
 function renderLibrary() {
   $('story-list').replaceChildren();
-  const stories = state.library.stories || [];
+  const q=($('story-search')?.value||'').trim().toLocaleLowerCase();const stories=[...(state.library.stories||[])].filter(story=>[story.title,story.character?.name,story.persona?.name,story.lastMessage].join(' ').toLocaleLowerCase().includes(q)).sort((a,b)=>(b.lastActivity||'').localeCompare(a.lastActivity||''));
+  if(!stories.length&&q){$('story-list').append(el('p','empty-state',t('No stories match your search.')));return;}
   if (!stories.length) {
     const empty = el('div', 'empty-notebook');
     empty.append(el('span', '', '✦'), el('h2', '', 'An unwritten world.'), el('p', '', 'Begin with a character and a place. The memories will grow from the moments you share.'));
@@ -102,14 +122,17 @@ function renderLibrary() {
     const card = button('', 'story-card', () => openStory(story.id).catch(error => showNotice(error.message, true)));
     const bottom = el('div', 'card-bottom'); bottom.append(el('span', '', 'Continue the story'), el('span', '', '↗'));
     card.append(el('div', 'card-monogram', Array.from(characterName)[0]?.toUpperCase() || '✦'), contentEl('h2', '', story.title || t('Untitled story')), contentEl('p', '', (uiLocale==='de'?'Mit ':'With ') + characterName), bottom);
+    if(story.persona?.name)card.insertBefore(contentEl('p','story-persona',story.persona.name),bottom);if(story.lastMessage)card.insertBefore(contentEl('p','story-preview',story.lastMessage),bottom);
     $('story-list').append(card);
   }
 }
-async function openStory(id) {
+async function openStory(id,options={}) {
+  const route='#story/'+encodeURIComponent(id);if(!options.fromRoute&&location.hash!==route){saveDraft();location.hash=route;return;}
+  const navigation=++storyNavigationEpoch;saveDraft();
   stopPolling(); state.lastSignature = ''; state.sendRequest = null;
-  state.story = await api('/api/stories/' + encodeURIComponent(id));
+  const opened=await api('/api/stories/'+encodeURIComponent(id));if(navigation!==storyNavigationEpoch||!state.session?.authenticated)return;state.story=opened;
   renderStory(true); restoreDraft(id); view('story-view');
-  setTimeout(() => $('composer').scrollIntoView({ block: 'end' }), 0);
+  restoreReading(id);
   schedulePoll();
 }
 function lastGeneration() { return state.story?.generations?.filter(g => g.status !== 'superseded').at(-1); }
@@ -137,17 +160,25 @@ async function refreshStory() {
 }
 function renderStory(force = false) {
   const story = state.story;
+  const followingLatest = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 260;
+  const previousStatus = $('generation-status').textContent;
+  const navigationEpoch = storyNavigationEpoch;
+  let appendedMessages = false;
   $('story-title').textContent = story.title;
   $('story-kicker').textContent = (uiLocale==='de'?'MIT ':'WITH ') + (story.character?.name || t('Your character'));
   if(unconfirmedThought&&state.story?.thoughtRequests?.some(r=>r.requestId===unconfirmedThought.requestId))unconfirmedThought=null;
   const signature = JSON.stringify({ revision: story.revision, messages: story.messages, memories: story.memories, threads: story.threads, thoughts: story.thoughts, relationship: story.relationship, scene: story.scene, generations: story.generations, thoughtRequests:story.thoughtRequests });
   if (force || signature !== state.lastSignature) {
-    const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 260;
+    const nearBottom = followingLatest;
     const previousCount = $('messages').children.length;
+    const focused=document.activeElement,focusId=focused?.closest('.message')?.id,focusText=focused?.textContent,stateFocus=$('state-content').contains(focused)?[...$('state-content').querySelectorAll('button')].indexOf(focused):-1;const priorAnchor=[...$('messages').children].find(n=>n.getBoundingClientRect().bottom>0),priorTop=priorAnchor?.getBoundingClientRect().top,priorId=priorAnchor?.id;
     renderMessages(); renderState(); state.lastSignature = signature;
+    if(focusId){const same=[...($(focusId)?.querySelectorAll('button,summary')||[])].find(n=>n.textContent===focusText);if(same){const disclosure=same.closest('details');if(disclosure)disclosure.open=true;same.focus({preventScroll:true});}}
+    if(stateFocus>=0){const candidate=$('state-content').querySelectorAll('button')[stateFocus];if(candidate?.textContent===focusText)candidate.focus({preventScroll:true});else if($('state-panel').classList.contains('open'))$('inspect-close').focus({preventScroll:true});}
+    if(!nearBottom&&priorId&&$(priorId))window.scrollBy(0,$(priorId).getBoundingClientRect().top-priorTop);
     if ($('messages').children.length > previousCount && !force) {
-      if (nearBottom) $('composer').scrollIntoView({ block: 'end', behavior: 'smooth' });
-      else $('jump-latest').hidden = false;
+      appendedMessages = true;
+      if (!nearBottom) $('jump-latest').hidden = false;
     }
   }
   const controls = story.controls || { tone: 'Natural', detail: 'balanced', length: 'medium' };
@@ -157,6 +188,13 @@ function renderStory(force = false) {
   }
   $('control-summary').textContent = [controls.tone,controls.detail,controls.length].map(value=>t(value[0].toUpperCase()+value.slice(1))).join(' · ');
   renderGeneration(); renderThoughtControls();
+  // Status can grow without another message (for example pending -> failed).
+  // Follow only readers who were already at the latest turn, after all layout changes.
+  if (!force && followingLatest && (appendedMessages || previousStatus !== $('generation-status').textContent)) {
+    requestAnimationFrame(() => {
+      if (state.view === 'story-view' && state.story?.id === story.id && storyNavigationEpoch === navigationEpoch) scrollToLatest();
+    });
+  }
 }
 function renderMessages() {
   $('messages').replaceChildren();
@@ -164,7 +202,7 @@ function renderMessages() {
     const article = el('article', 'message' + (message.kind==='thought'?' thought':'') + (message.role === 'user' ? ' user' : message.kind === 'intro' || message.type === 'intro' ? ' intro' : ''));
     article.id = 'message-' + message.id;
     article.append(contentEl('p', 'message-label', message.kind==='thought'?t('Inner thought'): message.kind === 'intro' || message.type === 'intro' ? t('Intro') : message.role === 'user' ? (state.story.persona?.name || t('You')) : state.story.character?.name || t('Character')), StoryNarration.render(contentEl('div', 'message-text'), message.text));
-    if(message.kind==='thought'){const actions=el('div','thought-actions');actions.append(button('Replace thought','quiet',()=>generateThought(message.id)),button('Delete thought','quiet',()=>deleteThought(message.id)));sourceButtons(actions,message.sources);article.append(actions);}
+    if(message.kind==='thought'){const actions=el('div','thought-actions');actions.append(button('Replace thought','quiet',()=>generateThought(message.id)),button('Delete thought','quiet',()=>deleteThought(message.id)));sourceButtons(actions,message.sources);const menu=actionMenu('Thought actions',[...actions.children]);menu.querySelector('summary').setAttribute('aria-label',t('Thought actions')+': '+message.text.slice(0,60));article.append(menu);}
     $('messages').append(article);
   }
   if (!$('messages').children.length) $('messages').append(el('p', 'empty-state', 'The scene is yours to begin. Write the first moment below.'));
@@ -205,21 +243,21 @@ function renderGeneration() {
 }
 function sourceButtons(parent, sources) {
   for (const source of sources || []) {
-    parent.append(button('↗ Source', 'source-link', () => {
-      closeInspector();
+    const sourceButton=button('↗ Source','source-link',()=>{
+      const fromMemory=$('state-panel').classList.contains('open')||$('state-panel').contains(document.activeElement);closeInspector();
       const message = $('message-' + source);
       if (!message) {
         const audit = state.story.messages?.find(item => item.id === source && item.superseded);
         if (audit) {
           const dialog = document.createElement('dialog'), content = el('section','create-form');
           content.append(el('h2','','Earlier source'),el('p','hint','This message belongs to a replaced turn. It is retained as source evidence, not current story context.'),contentEl('p','message-text',audit.text),button('Close','quiet',()=>dialog.close()));
-          dialog.append(content);document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+          dialog.append(content);nameDialog(dialog,content.querySelector('h2'));document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
         } else showNotice('This source message is not available in the displayed transcript.', true);
         return;
       }
-      message.scrollIntoView({ behavior: 'smooth', block: 'center' }); message.classList.add('flash');
+      message.tabIndex=-1;message.focus({preventScroll:true});message.scrollIntoView({behavior:'smooth',block:'center'});message.classList.add('flash');if(fromMemory){let back=$('return-memory');if(!back){back=button('Back to story memory','source-return',()=>{$('inspect-toggle').click();});back.id='return-memory';$('story-view').append(back);}back.hidden=false;}
       setTimeout(() => message.classList.remove('flash'), 2500);
-    }));
+    });sourceButton.setAttribute('aria-label',t('View source message')+' '+String(source).slice(0,8));parent.append(sourceButton);
   }
 }
 function section(title, entries, emptyText, type) {
@@ -269,7 +307,7 @@ async function removeMemory(entry) {
 function closeInspector() {
   $('state-panel').classList.remove('open'); $('state-panel').removeAttribute('role'); $('state-panel').removeAttribute('aria-modal');
   $('inspect-toggle').setAttribute('aria-expanded', 'false');
-  for (const element of document.querySelectorAll('.conversation,.story-heading,.masthead')) element.inert = false;
+  for (const element of document.querySelectorAll('.conversation,.story-heading,.masthead,#app-nav')) element.inert = false;
 }
 function selectOptions(select, values) {
   select.replaceChildren(); const fresh = el('option', '', '+ Create new'); fresh.value = ''; select.append(fresh);
@@ -295,31 +333,33 @@ $('logout').addEventListener('click', async () => {
   catch (error) { clearDrafts(); showNotice('Could not confirm server logout. Close this browser and reconnect to lock the server session. Local drafts were cleared. ' + error.message, true); }
   finally { $('logout').disabled = false; }
 });
-$('back').addEventListener('click', () => { saveDraft(); loadLibrary().catch(error => showNotice(error.message, true)); });
+$('back').addEventListener('click',()=>{saveDraft();location.hash='stories';});
+let createEpoch=0;
 $('new-story').addEventListener('click', () => {
+  createEpoch++;
   $('create-form').reset(); $('create-error').hidden = true;
   selectOptions($('character-choice'), state.library.characters.filter(c=>!c.draft)); selectOptions($('persona-choice'), state.library.personas);
-  updateNewFields(); $('create-dialog').showModal();
+  restoreNewStoryDraft();updateNewFields(); $('create-dialog').showModal();
 });
 for (const kind of ['character', 'persona']) $(kind + '-choice').addEventListener('change', updateNewFields);
 $('close-create').addEventListener('click', () => $('create-dialog').close());
 $('close-memory').addEventListener('click', () => $('memory-dialog').close());
 $('create-form').addEventListener('submit', async event => {
   event.preventDefault(); event.submitter.disabled = true; $('create-error').hidden = true;
-  const data = new FormData(event.target);
+  const data = new FormData(event.target),epoch=createEpoch,sessionEpoch=state.sessionEpoch;const current=()=>epoch===createEpoch&&sessionEpoch===state.sessionEpoch&&$('create-dialog').open;
   try {
     let characterId = data.get('characterId'), personaId = data.get('personaId');
     if (!characterId) {
       const character = await api('/api/characters', { method: 'POST', body: JSON.stringify({ name: data.get('characterName').trim(), definition: data.get('characterDefinition').trim(), opening: data.get('opening').trim() }) });
-      characterId = character.id; state.library.characters.push(character); selectOptions($('character-choice'), state.library.characters); $('character-choice').value = characterId; updateNewFields();
+      if(!current())return;characterId = character.id; state.library.characters.push(character); selectOptions($('character-choice'), state.library.characters); $('character-choice').value = characterId; updateNewFields();
     }
     if (!personaId) {
       const persona = await api('/api/personas', { method: 'POST', body: JSON.stringify({ name: data.get('personaName').trim(), definition: data.get('personaDefinition').trim() }) });
-      personaId = persona.id; state.library.personas.push(persona); selectOptions($('persona-choice'), state.library.personas); $('persona-choice').value = personaId; updateNewFields();
+      if(!current())return;personaId = persona.id; state.library.personas.push(persona); selectOptions($('persona-choice'), state.library.personas); $('persona-choice').value = personaId; updateNewFields();
     }
     const story = await api('/api/stories', { method: 'POST', body: JSON.stringify({ characterId, personaId, title: data.get('title').trim() }) });
-    $('create-dialog').close(); showNotice(''); await openStory(story.id);
-  } catch (error) { $('create-error').textContent = error.message; $('create-error').hidden = false; }
+    if(!current())return;editorDraft('new-story').clear();$('create-dialog').dataset.saved='true';$('create-dialog').close();showNotice('');await openStory(story.id);
+  } catch (error) {if(!current())return;saveNewStoryDraft();$('create-error').textContent = t('Any character or persona already created remains in your library. Your draft is preserved.')+' '+error.message; $('create-error').hidden = false; }
   finally { event.submitter.disabled = false; }
 });
 $('controls-form').addEventListener('submit', async event => {
@@ -370,11 +410,11 @@ $('delete-story').addEventListener('click', async () => {
 $('inspect-toggle').addEventListener('click', () => {
   $('state-panel').classList.add('open'); $('state-panel').setAttribute('role', 'dialog'); $('state-panel').setAttribute('aria-modal', 'true');
   $('inspect-toggle').setAttribute('aria-expanded', 'true');
-  for (const element of document.querySelectorAll('.conversation,.story-heading,.masthead')) element.inert = true;
+  for (const element of document.querySelectorAll('.conversation,.story-heading,.masthead,#app-nav')) element.inert = true;
   $('inspect-close').focus();
 });
 $('inspect-close').addEventListener('click', () => { closeInspector(); $('inspect-toggle').focus(); });
-$('jump-latest').addEventListener('click', () => { $('composer').scrollIntoView({ behavior: 'smooth', block: 'end' }); $('jump-latest').hidden = true; });
+$('jump-latest').addEventListener('click', () => { scrollToLatest('smooth'); });
 document.addEventListener('keydown', event => {
   if (!$('state-panel').classList.contains('open')) return;
   if (event.key === 'Escape' && !$('memory-dialog').open) { closeInspector(); $('inspect-toggle').focus(); }
@@ -422,15 +462,15 @@ function renderDefinitions() {
     list.append(section);
   }
 }
-$('manage-library').addEventListener('click',()=>{renderDefinitions();$('library-dialog').showModal();});
+$('manage-library').addEventListener('click',()=>{location.hash='characters';});
 $('close-library').addEventListener('click',()=>$('library-dialog').close());
 $('close-definition').addEventListener('click',()=>$('definition-dialog').close());
 $('definition-form').addEventListener('submit',async event=>{
-  event.preventDefault();event.submitter.disabled=true;
+  event.preventDefault();event.submitter.disabled=true;const definitionEpoch=typeof characterEditEpoch==='number'?characterEditEpoch:0,sessionEpoch=state.sessionEpoch;
   try {
     const {kind,id}=state.editingDefinition, changes={name:$('definition-name').value.trim(),definition:$('definition-text').value.trim()};
     if(kind==='characters')Object.assign(changes, readCharacterFields(), {opening:$('definition-opening').value.trim()});
-    await api(`/api/${kind}${id ? '/' + encodeURIComponent(id) : ''}`,{method:id?'PATCH':'POST',body:JSON.stringify(changes)});
+    const saved=await api(`/api/${kind}${id ? '/' + encodeURIComponent(id) : ''}`,{method:id?'PATCH':'POST',body:JSON.stringify(changes)});if(sessionEpoch!==state.sessionEpoch||!$('definition-dialog').open||state.editingDefinition?.id!==id||(typeof characterEditEpoch==='number'&&characterEditEpoch!==definitionEpoch))return;document.dispatchEvent(new CustomEvent('definition-saved',{detail:{kind,id,savedId:saved.id}}));
     state.library=await api('/api/library?summary=true');renderDefinitions();$('definition-dialog').close();if(state.view==='characters-view'||state.view==='character-view')await loadCharacters();showNotice('Definition saved. Existing stories retain their snapshots.');
   }catch(error){$('definition-error').textContent=error.message;$('definition-error').hidden=false;}finally{event.submitter.disabled=false;}
 });
@@ -461,7 +501,7 @@ $('export-data').addEventListener('click',async()=>{
 $('import-data').addEventListener('click',()=>$('import-file').click());
 $('import-file').addEventListener('change',async event=>{
   const file=event.target.files[0];event.target.value='';if(!file)return;
-  if(file.size>8*1024*1024){showNotice('Import is too large (maximum 8 MiB).',true);return;}
+  let limits;try{limits=await api('/api/transfer-limits');}catch(error){showNotice(error.message,true);return;}const maximum=limits.notebookBytes;if(!Number.isSafeInteger(maximum)||file.size>maximum){showNotice('This file is too large.',true);return;}
   if(!uiConfirm('Import this notebook as additional records? The file may contain private story text. Existing records will remain.'))return;
   try{const archive=JSON.parse(await file.text());await api('/api/import',{method:'POST',body:JSON.stringify(archive)});await loadLibrary();showNotice('Notebook imported. No model requests were sent.');}catch(error){showNotice(error.message,true);}
 });
@@ -483,10 +523,28 @@ const smaller=button('Decrease text size','quiet',()=>setChatSize(chatSizes[Math
 readingButtons.append(smaller,sizeLabel,larger,resetSize);reading.append(readingTitle,readingButtons);$('settings-tools').append(reading);
 function setChatSize(value){const following=innerHeight+scrollY>=document.documentElement.scrollHeight-100;const anchor=[...document.querySelectorAll('#messages .message')].find(n=>n.getBoundingClientRect().bottom>0),top=anchor?.getBoundingClientRect().top;chatSize=value;try{localStorage.setItem(chatSizeKey,String(value));}catch{}applyChatSize();requestAnimationFrame(()=>{if(state.view!=='story-view')return;if(following)window.scrollTo(0,document.documentElement.scrollHeight);else if(anchor?.isConnected)window.scrollBy(0,anchor.getBoundingClientRect().top-top);});}
 function applyChatSize(){document.documentElement.style.setProperty('--chat-text-scale',String(chatSize/100));sizeLabel.textContent=chatSize+'%';smaller.disabled=chatSize===85;larger.disabled=chatSize===150;}applyChatSize();
-const thoughtBar=el('section','thought-controls'),thoughtGenerate=button('Generate inner thought','quiet',()=>generateThought()),thoughtStatus=el('p','hint'),thoughtCancel=button('Cancel thought generation','quiet',()=>cancelThought());thoughtStatus.setAttribute('role','status');const thoughtCheck=button('Check thought status','quiet',async()=>{try{const checkId=state.story?.id;await refreshStory();if(state.story?.id!==checkId||unconfirmedThought?.storyId!==checkId)return;if(unconfirmedThought&&!state.story?.thoughtRequests?.some(r=>r.requestId===unconfirmedThought.requestId))unconfirmedThought=null;renderThoughtControls();}catch(e){showNotice(e.message,true);}});thoughtBar.append(thoughtCheck,thoughtGenerate,el('p','hint',t('One fictional thought using your ChatGPT allowance. It is not spoken dialogue.')),thoughtStatus,thoughtCancel);$('composer').before(thoughtBar);
+const thoughtBar=el('section','thought-controls'),thoughtGenerate=button('Generate inner thought','quiet',()=>generateThought()),thoughtStatus=el('p','hint'),thoughtCancel=button('Cancel thought generation','quiet',()=>cancelThought());thoughtStatus.setAttribute('role','status');const thoughtCheck=button('Check thought status','quiet',async()=>{try{const checkId=state.story?.id;await refreshStory();if(state.story?.id!==checkId||unconfirmedThought?.storyId!==checkId)return;if(unconfirmedThought&&!state.story?.thoughtRequests?.some(r=>r.requestId===unconfirmedThought.requestId))unconfirmedThought=null;renderThoughtControls();}catch(e){showNotice(e.message,true);}});thoughtBar.append(actionMenu('Story actions',[thoughtGenerate,el('p','hint',t('One fictional thought using your ChatGPT allowance. It is not spoken dialogue.'))]),thoughtCheck,thoughtStatus,thoughtCancel);$('composer').before(thoughtBar);
 let thoughtActionBusy=false,unconfirmedThought=null;
 function unknownThoughtHere(){return !!unconfirmedThought&&unconfirmedThought.storyId===state.story?.id;}
 function renderThoughtControls(){const pending=state.story?.thoughtRequests?.find(r=>r.status==='pending'),last=state.story?.thoughtRequests?.at(-1);thoughtGenerate.disabled=state.busy||isGenerating()||thoughtActionBusy||unknownThoughtHere();thoughtCheck.hidden=!unknownThoughtHere();thoughtCancel.hidden=!pending;thoughtCancel.disabled=thoughtActionBusy;thoughtStatus.textContent=pending?t('Writing a fictional thought…'):unknownThoughtHere()?t('Thought request could not be confirmed. Check saved status before trying again.'):last&&['failed','interrupted','cancelled'].includes(last.status)?t('Thought generation did not complete. No partial thought was added.') : '';for(const n of document.querySelectorAll('.thought-actions button'))n.disabled=state.busy||isGenerating()||thoughtActionBusy||unknownThoughtHere();}
 async function generateThought(replaceId){if(state.busy||isGenerating()||thoughtActionBusy||unknownThoughtHere())return;const id=state.story.id,epoch=state.sessionEpoch,requestId=crypto.randomUUID();thoughtActionBusy=true;renderThoughtControls();try{await api('/api/stories/'+id+'/thoughts',{method:'POST',body:JSON.stringify({requestId,...(replaceId?{replaceId}:{})})});if(epoch!==state.sessionEpoch||state.story?.id!==id)return;unconfirmedThought=null;await refreshStory();schedulePoll(500);}catch(e){if(epoch===state.sessionEpoch&&state.story?.id===id){unconfirmedThought={storyId:id,requestId};showNotice(e.message,true);schedulePoll(500);}}finally{thoughtActionBusy=false;renderThoughtControls();}}
 async function cancelThought(){const storyId=state.story?.id,epoch=state.sessionEpoch;const r=state.story?.thoughtRequests?.find(r=>r.status==='pending');if(!r)return;thoughtActionBusy=true;try{const updated=await api('/api/stories/'+storyId+'/thoughts/cancel',{method:'POST',body:JSON.stringify({requestId:r.requestId})});if(epoch!==state.sessionEpoch||state.story?.id!==storyId)return;state.story=updated;renderStory(true);}catch(e){showNotice(e.message,true);}finally{thoughtActionBusy=false;renderThoughtControls();}}
 async function deleteThought(id){const storyId=state.story?.id,epoch=state.sessionEpoch;if(isGenerating()||!uiConfirm('Delete this fictional thought? It will no longer guide future replies.'))return;try{const updated=await api('/api/stories/'+storyId+'/thoughts/'+id,{method:'DELETE'});if(epoch!==state.sessionEpoch||state.story?.id!==storyId)return;state.story=updated;renderStory(true);}catch(e){showNotice(e.message,true);}}
+
+function saveNewStoryDraft(){if($('create-dialog').dataset.saved==='true')return;editorDraft('new-story').write(Object.fromEntries([...$('create-form').elements].filter(n=>n.name).map(n=>[n.name,n.value])));}
+function restoreNewStoryDraft(){$('create-dialog').dataset.saved='';const saved=editorDraft('new-story').read();if(saved){for(const [key,value]of Object.entries(saved)){const field=$('create-form').elements.namedItem(key);if(field&&typeof value==='string')field.value=value;}showNotice('Your saved draft is ready.');}}
+$('create-form').addEventListener('input',saveNewStoryDraft);$('create-form').addEventListener('change',saveNewStoryDraft);$('create-dialog').addEventListener('close',()=>{saveNewStoryDraft();createEpoch++;});$('create-dialog').addEventListener('cancel',saveNewStoryDraft);
+const discardNew=button('Discard draft','quiet',()=>{if(!uiConfirm('Discard this saved draft?'))return;editorDraft('new-story').clear();$('create-form').reset();updateNewFields();$('create-dialog').dataset.saved='';});$('create-form').append(discardNew);
+const storySearch=el('input');storySearch.id='story-search';storySearch.type='search';storySearch.placeholder=t('Search stories');storySearch.setAttribute('aria-label',t('Search stories'));storySearch.addEventListener('input',renderLibrary);$('story-list').before(storySearch);
+const chatReading=el('details','chat-reading'),chatReadingLabel=el('summary','',t('Reading preferences')),chatReadingButtons=el('div','reading-buttons');chatReadingButtons.append(button('Decrease text size','quiet',()=>setChatSize(chatSizes[Math.max(0,chatSizes.indexOf(chatSize)-1)])),button('Increase text size','quiet',()=>setChatSize(chatSizes[Math.min(chatSizes.length-1,chatSizes.indexOf(chatSize)+1)])),button('Reset to default','quiet',()=>setChatSize(100)));chatReading.append(chatReadingLabel,chatReadingButtons);$('messages').before(chatReading);
+for(const dialog of document.querySelectorAll('dialog')){const heading=dialog.querySelector('h1,h2,h3');if(heading)nameDialog(dialog,heading);}
+window.addEventListener('pagehide',()=>{saveReading();if($('create-dialog').open)saveNewStoryDraft();});
+let readingSaveTimer;window.addEventListener('scroll',()=>{clearTimeout(readingSaveTimer);readingSaveTimer=setTimeout(saveReading,250);},{passive:true});
+
+function groupSettings(){const deviceSection=el('section','settings-group'),backupSection=el('section','settings-group');deviceSection.append(el('h2','',t('Device')),$('install-help'));backupSection.append(el('h2','',t('Backup and transfer')),$('export-data'),$('import-data'));$('settings-tools').append(deviceSection,backupSection);$('manage-library').hidden=true;}
+if(document.readyState!=='complete')document.addEventListener('DOMContentLoaded',groupSettings,{once:true});else groupSettings();
+
+// Navigation may trigger browser hash scrolling before asynchronous route work.
+// Preserve the last continuously recorded reading anchor through that transition.
+$('app-nav').addEventListener('click',()=>{if(state.view==='story-view'){leavingReading=true;clearTimeout(readingSaveTimer);}},{capture:true});
+$('back').addEventListener('click',()=>{leavingReading=true;clearTimeout(readingSaveTimer);},{capture:true});

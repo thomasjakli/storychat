@@ -102,6 +102,7 @@ export function createApplication({store, provider, password, origin, secureCook
 
         if(importing && req.method!=='GET') throw fail('conflict','Import in progress.');
         if (req.method === 'POST' && path === '/api/logout') { sessions.delete(token); res.setHeader('Set-Cookie',cookie('')); return send(res,200,{authenticated:false}); }
+        if (req.method === 'GET' && path === '/api/transfer-limits') return send(res,200,{notebookBytes:media?MAX_MEDIA_BACKUP_BYTES:MAX_TRANSFER_BYTES,itemBytes:media?MAX_MEDIA_BACKUP_BYTES:MAX_TRANSFER_BYTES,uploadBytes:MAX_UPLOAD_BYTES});
         if (req.method === 'GET' && path === '/api/characters') {
           const allowed=['q','category','tag','favorites','archived','gender','sort','offset','limit'];
           if ([...url.searchParams.keys()].some(k=>!allowed.includes(k))) throw fail('invalid','Unknown filter.');
@@ -150,7 +151,7 @@ export function createApplication({store, provider, password, origin, secureCook
           const value=await body(req,media?MAX_MEDIA_BACKUP_BYTES:MAX_TRANSFER_BYTES);
           validateItem(splitBundle(value).data);
           await validateItemBundle(value,media);
-          if(path.endsWith('/preview')){const entry=splitBundle(value).data.library[0];return send(res,200,{type:entry.type,data:entry.data});}
+          if(path.endsWith('/preview')){const bundle=splitBundle(value),entry=bundle.data.library[0],asset=bundle.assets.find(a=>a.meta.id===entry.data.cover);return send(res,200,{type:entry.type,data:entry.data,thumbnail:asset?'data:image/webp;base64,'+asset.thumbnail:null,status:entry.type==='character'&&(entry.data.draft||!entry.data.definition.trim())?'draft':'ready'});}
           if(active)throw fail('conflict','Wait for generation to finish before importing.');
           const staged=await stageItemBundle(value,media);
           try{return send(res,201,importItem(store,staged.data));}catch(error){await staged.rollback();throw error;}

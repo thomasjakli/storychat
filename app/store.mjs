@@ -98,7 +98,7 @@ export class Store {
     const rows=this.db.prepare('SELECT type,data FROM library').all();
     const characters=rows.filter(r=>r.type==='character').map(r=>this.definition(JSON.parse(r.data).id,'character'));
     const personas=rows.filter(r=>r.type==='persona').map(r=>this.definition(JSON.parse(r.data).id,'persona'));
-    const stories=this.db.prepare('SELECT data FROM stories').all().map(r=>{const story=JSON.parse(r.data);return {id:story.id,title:story.title,character:summary?brief(story.character):story.character,persona:summary?brief(story.persona):story.persona,revision:story.revision};});
+    const stories=this.db.prepare('SELECT data FROM stories').all().map(r=>{const story=JSON.parse(r.data);return {id:story.id,title:story.title,character:summary?brief(story.character):story.character,persona:summary?brief(story.persona):story.persona,revision:story.revision,lastActivity:story.messages.filter(m=>!m.superseded).at(-1)?.createdAt??'',lastMessage:(story.messages.filter(m=>!m.superseded&&!m.kind).at(-1)?.text??'').slice(0,180)};});
     return {characters:summary?characters.map(brief):characters,personas:summary?personas.map(brief):personas,stories};
   }
 
