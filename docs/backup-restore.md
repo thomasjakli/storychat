@@ -6,7 +6,7 @@ Imports validate a bounded versioned format and atomically reject identifier col
 
 Portable browser exports intentionally omit generation attempts, prompt contexts and rollback snapshots. Historical messages and current state remain, but historical turns cannot be regenerated immediately after restore; create a new turn to establish a new rollback baseline. Secure erasure of historical SQLite pages or external backups is not provided.
 
-Offline logical backups preserve validated generation history, prompt contexts and rollback baselines, allowing recovery of regeneration support. These additional private narrative records remain credential-free. For offline operations, stop the application cleanly, then run these commands with Node 24 and dedicated private paths:
+Offline logical backups preserve validated generation history and retained prompt contexts/rollback baselines, allowing recovery of latest-turn regeneration. Obsolete prompt/rollback snapshots are compacted when subsequent requests are prepared; transcripts and source evidence remain. These additional private narrative records remain credential-free. Logical JSON is limited to 64 MiB, including when using this helper; larger instances require a [stopped-instance database/media snapshot](scalable-memory.md). For offline operations, stop the application cleanly, then run these commands with Node 24 and dedicated private paths:
 
 ```sh
 node app/backup.mjs backup /private/stories/storychat.sqlite /private/backups/stories.json
