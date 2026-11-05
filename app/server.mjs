@@ -21,7 +21,9 @@ const safeProviderErrors = {
   provider_configuration: 'Configure STORYCHAT_ACCOUNT_ID and STORYCHAT_MODEL after local sign-in and catalog discovery, then restart.',
   provider_unavailable: 'ChatGPT is unavailable. Check the protected runtime and complete local sign-in if needed.',
   invalid_output: 'The response failed state validation. No model state was applied. Retry explicitly when ready.',
-  context_limit: 'The story context limit was reached. Remove unneeded state before continuing.',
+  context_limit: 'Protected story information exceeds the reply context budget. Review overly long character/persona definitions, pinned or corrected facts, and memory-removal rules before retrying. Stored history has not been removed.',
+  story_limit: 'This story reached the supported transcript or request-history capacity. Preserve a stopped-instance database/media snapshot before continuing in a new story; see docs/scalable-memory.md. Existing history is preserved.',
+  transfer_limit: 'This notebook exceeds the portable transfer size limit. Preserve a stopped-instance database/media snapshot for full recovery; see docs/scalable-memory.md. The JSON backup helper has the same logical size limit. Do not delete history to make an export fit.',
   runtime_locked: 'The credential runtime is locked. Stop the other process. On Windows after a crash, verify every runtime process is stopped before manually removing its lock file. Never delete Linux lock files.',
   runtime_lock_unavailable: 'Linux runtime locking requires util-linux flock and accessible persistent volumes.',
   subscription_sharing_usage_unavailable: 'ChatGPT allowance or access is unavailable. Your story and draft are preserved.'
@@ -34,7 +36,7 @@ function publicFailure(error) {
 }
 async function body(req, limit = 32768) {
   let bytes = 0; const chunks = [];
-  for await (const chunk of req) { bytes += chunk.length; if (bytes > limit) throw fail('invalid','Request too large.'); chunks.push(chunk); }
+  for await (const chunk of req) { bytes += chunk.length; if (bytes > limit) throw fail(limit >= MAX_TRANSFER_BYTES ? 'transfer_limit' : 'invalid','Request too large.'); chunks.push(chunk); }
   try { const value = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error(); return value; }
   catch { throw fail('invalid','Expected JSON object.'); }
 }
@@ -217,7 +219,7 @@ export function createApplication({store, provider, password, origin, secureCook
       const extension=files[path].split('.').pop();
       const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',webmanifest:'application/manifest+json',png:'image/png',svg:'image/svg+xml'};
       const bytes=await readFile(resolve(root,'public',files[path])); res.writeHead(200,{'Content-Type':types[extension]}); res.end(bytes);
-    } catch(error) { if (!res.headersSent) send(res,error.code === 'not_found' ? 404 : error.code === 'conflict' ? 409 : error.code === 'invalid' ? 400 : 500,{error:publicFailure(error)}); else res.end(); } finally {releaseMutation?.();}
+    } catch(error) { if (!res.headersSent) send(res,error.code === 'not_found' ? 404 : ['conflict','story_limit'].includes(error.code) ? 409 : error.code === 'transfer_limit' ? 413 : error.code === 'context_limit' ? 422 : error.code === 'invalid' ? 400 : 500,{error:publicFailure(error)}); else res.end(); } finally {releaseMutation?.();}
   });
   server.requestTimeout=30000;
   return {server, close() {

@@ -31,7 +31,7 @@ test('recent narrative context keeps latest complete messages within count and t
 });
 test('legacy six-message lossless contexts above new budget remain importable',()=>{
  const s=new Store(':memory:');try{const story=setup(s);for(let i=0;i<3;i++){const a=s.beginTurn(story.id,{requestId:'legacy-'+i,text:'Q'+i+'.'.repeat(5000)});s.finishTurn(story.id,a.generation.id,empty('A'+i+'.'.repeat(5000)));}
- const backup=exportData(s,{includeHistory:true}),v=backup.stories[0];for(const g of v.generations){const reserved=g.assistantMessageId;delete g.assistantMessageId;delete g.context.replySourceId;g.context.sourceIds=g.context.sourceIds.filter(id=>id!==reserved);}
+ const backup=exportData(s,{includeHistory:true}),v=backup.stories[0];for(const g of v.generations){const reserved=g.assistantMessageId;delete g.assistantMessageId;if(g.context){delete g.context.replySourceId;g.context.sourceIds=g.context.sourceIds.filter(id=>id!==reserved);}}
  const legacy=v.generations.at(-1);legacy.context.messages=structuredClone(v.messages.slice(0,6));legacy.context.sourceIds=legacy.context.messages.map(m=>m.id);assert.ok(legacy.context.messages.reduce((n,m)=>n+m.text.length,0)>24000);validateTransfer(backup);
  }finally{s.close();}
 });
