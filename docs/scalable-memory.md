@@ -117,6 +117,20 @@ pinned, subject to the explicit protected-context budget. Further indexing/pagin
 or semantic retrieval should be driven by measured need, not extra model workloads.
 
 No interface layout or frontend files changed. Real Android behavior and live
-provider quality were not exercised by these synthetic checks. Linux container
-verification must be run before publication; this local host has no running Docker
-daemon. No image was published and the branch was not merged.
+provider quality were not exercised by these synthetic checks. Local Docker was
+unavailable; Linux container verification was subsequently completed in CI.
+
+## Approved release (2026-11-05)
+
+The owner explicitly authorized merge, push and CI publication. Implementation was
+merged into master (`f643a39`); the first CI run passed 129 application and 62 adapter
+checks without skips but exposed a missing `.dockerignore` allowlist entry. Packaging
+fix `de40a1bc0f3d192c11826099e7cf92bba53b153a` resolved it.
+[Successful workflow](https://github.com/thomasjakli/storychat/actions/runs/42052556572)
+passed Linux tests, Compose validation, image build and both container lifecycle/
+isolated-recovery runs, then published `ghcr.io/thomasjakli/storychat:latest` and
+`ghcr.io/thomasjakli/storychat:sha-de40a1bc0f3d192c11826099e7cf92bba53b153a`.
+Both tags have immutable digest
+`sha256:a843222d137bf234c73d0636d4374798e9401c6a79378531fc29c4120771bc31`.
+The deployed instance was not changed; owner re-pull/recreation and affected-story
+acceptance remain separate actions. Preserve a stopped-instance backup first.
