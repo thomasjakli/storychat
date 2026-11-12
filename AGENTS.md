@@ -179,4 +179,6 @@ Use subagents for subtasks within this project when authorized. Create separate 
 
 ## Visual release review
 
+Read and follow [FRONTEND.md](FRONTEND.md) whenever building or changing the app UI.
+
 For changes to visible screens, inspect rendered screenshots before publishing at 360px and 390px widths in both English and German, plus a desktop width. Review alignment, wrapping/overflow, active/disabled button contrast, touch targets, and long labels. Source/DOM tests alone do not satisfy this visual gate. Record what was actually viewed and keep real Android verification separate. User-reported defects must become explicit review scenarios.
