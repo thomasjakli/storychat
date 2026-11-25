@@ -1,5 +1,6 @@
 // Fictional chronology only. Wall-clock message timestamps never enter arithmetic.
-export const TIMELINE_VERSION = 1;
+import {newDayState,narrativeCues,inferNarrativeDay} from './narrative-time.mjs';
+export const TIMELINE_VERSION = 2;
 export const RELATIVE_ORIGIN_LABEL = 'Relative story origin; calendar and clock unknown';
 export const timeStepSchema = { type: 'object', additionalProperties: false,
   properties: {
@@ -46,6 +47,7 @@ export function reconstructTime(message) {
 
 const clockMinutes=time=>Number(time.slice(0,2))*60+Number(time.slice(3));
 const stamp=(date,time)=>Date.parse(date+'T'+time+':00Z')/60000;
+const shiftDate=(date,days)=>{const value=new Date(Date.parse(date+'T00:00Z')+days*86400000).toISOString();return /^\d{4}-/.test(value)?value.slice(0,10):null;};
 function advance(previous, step, id) {
   let delta=step.advanceMinutes;
   if(previous&&step.date&&step.time&&previous.date&&previous.time) {
@@ -69,28 +71,51 @@ function advance(previous, step, id) {
 }
 
 export function buildTimeline(story) {
-  const points=[];let current=null;
+  const points=[];let current=null,dayState=newDayState();
   const active=new Set(story.messages.filter(m=>!m.superseded&&m.kind!=='thought').map(m=>m.id));
   const invalidUsers=new Set((story.generations??[]).filter(g=>['failed','interrupted','superseded'].includes(g.status)).map(g=>g.userMessageId));
   for(const message of story.messages) {
-    if(message.superseded||message.kind==='thought'||message.kind==='intro'||invalidUsers.has(message.id))continue;
+    if(message.superseded||message.kind==='thought'||message.kind==='intro'||invalidUsers.has(message.id)||(message.role==='user'&&message.storyTime===null))continue;
     // A relative origin needs no invented calendar or time of day. This lets
     // later explicit durations be related to activities in the opening exchange.
     if(!current) {
       current={segment:message.id,minute:0,date:null,time:null,label:RELATIVE_ORIGIN_LABEL,sourceId:message.id,sources:[message.id],origin:'reconstructed'};
       points.push(current);
     }
-    const step=Object.hasOwn(message,'storyTime')?message.storyTime:reconstructTime(message);
-    if(step&&step.sources.every(id=>active.has(id))&&!(story.suppression??[]).some(s=>step.label.toLocaleLowerCase().includes(s.text.toLocaleLowerCase()))){current=advance(current,step,message.id);if(points.at(-1)?.sourceId===message.id)points.pop();points.push(current);}
+    let step=message.storyTime??reconstructTime(message);
+    const suppressed=text=>(story.suppression??[]).some(s=>text.toLocaleLowerCase().includes(s.text.toLocaleLowerCase()));
+    if(step&&(!step.sources.every(id=>active.has(id))||suppressed(step.label)))step=null;
+    // An assistant may echo the user's already-counted standalone numeric skip.
+    if(step?.origin==='reconstructed'&&step.advanceMinutes>0&&message.role==='assistant'&&dayState.lastMessage?.role==='user'&&points.at(-1)?.sourceId===dayState.lastMessage.id&&points.at(-1)?.label===step.label)step=null;
+    const previous=current;
+    if(step)current=advance(current,step,message.id);
+    const cues=narrativeCues(message).filter(c=>!suppressed(c.text));
+    if(step?.time&&previous.time&&clockMinutes(step.time)<clockMinutes(previous.time)&&!step.date&&!step.advanceMinutes&&!cues.some(c=>['nextMorning','nextDay','morning','wake'].includes(c.kind))){dayState.segment=message.id;dayState.uncertain=true;}
+    let days=step?.advanceMinutes!=null?Math.floor(((previous.time?clockMinutes(previous.time):0)+step.advanceMinutes)/1440):null;
+    // A known calendar rollover is stronger than a generic 24-hour estimate.
+    const inferred=inferNarrativeDay(dayState,message,cues,{explicitDays:days,explicitDate:step?.date||(step?.advanceMinutes>0?current.date:null),previousDate:previous.date,explicitTime:step?current.time:null});
+    dayState=inferred.state;
+    if(step&&current.time)dayState.phase=Number(current.time.slice(0,2))<5?'night':Number(current.time.slice(0,2))<12?'morning':Number(current.time.slice(0,2))<18?'afternoon':Number(current.time.slice(0,2))<22?'evening':'night';
+    const dayDifference=dayState.day-(previous.storyDay??1);
+    if(inferred.changed&&!step?.date&&!step?.time&&!(step?.advanceMinutes>0)) {
+      const date=previous.date&&dayDifference>=0&&!cues.some(c=>c.kind==='unknown')?shiftDate(previous.date,dayDifference):null;
+      const unknownMinutes=dayDifference!==0||dayState.phase!==previous.dayPhase||cues.some(c=>['unknown','sleep','nap'].includes(c.kind));
+      current={...previous,...(unknownMinutes?{segment:message.id,minute:0,date,time:null}:{}),label:cues.map(c=>c.text).join('; ').slice(0,200),sourceId:message.id,sources:[message.id],origin:'reconstructed'};
+    }
+    if(step||inferred.changed||!current.storyDay) {
+      current={...current,storyDay:dayState.day,daySegment:dayState.segment,dayPhase:dayState.phase,dayConfidence:dayState.confidence,dayUncertain:dayState.uncertain};
+      if(points.at(-1)?.sourceId===message.id)points.pop();points.push(current);
+    }
   }
   return {version:TIMELINE_VERSION,points};
 }
 
 export function timelineContext(story) {
-  const timeline=buildTimeline(story),byMessage=new Map(),order=new Map();let index=0,current=null;
-  for(const message of story.messages){if(message.superseded||message.kind==='thought')continue;if(timeline.points[index]?.sourceId===message.id)current=timeline.points[index++];order.set(message.id,order.size);byMessage.set(message.id,current);}
+  const timeline=buildTimeline(story),byMessage=new Map(),order=new Map(),messageStarts=new Map();let index=0,current=null;
+  const invalidUsers=new Set((story.generations??[]).filter(g=>['failed','interrupted','superseded'].includes(g.status)).map(g=>g.userMessageId));
+  for(const message of story.messages){if(message.superseded||message.kind==='thought'||invalidUsers.has(message.id)||(message.role==='user'&&message.storyTime===null))continue;messageStarts.set(message.id,current??{storyDay:1});if(timeline.points[index]?.sourceId===message.id)current=timeline.points[index++];order.set(message.id,order.size);byMessage.set(message.id,current);}
   const latest=timeline.points.at(-1)??null;
-  return {current:latest, byMessage, order};
+  return {current:latest, byMessage, order, messageStarts, invalidUsers};
 }
 
 export function evidenceTimes(entries, clock) {
@@ -100,14 +125,17 @@ export function evidenceTimes(entries, clock) {
     const first=clock.byMessage.get(source)??null;
     const elapsed=first&&clock.current&&first.segment===clock.current.segment?clock.current.minute-first.minute:null;
     const days=first?.date&&clock.current?.date?(stamp(clock.current.date,'00:00')-stamp(first.date,'00:00'))/1440:null;
-    return {recordId:entry.id,sourceId:source??null,firstEvidencedAt:first,minutesSinceEvidence:elapsed,calendarDaysSinceEvidence:days!==null&&days>=0?days:null};
+    const narrativeDays=first&&clock.current&&first.daySegment===clock.current.daySegment?clock.current.storyDay-first.storyDay:null;
+    return {recordId:entry.id,sourceId:source??null,firstEvidencedAt:first,minutesSinceEvidence:elapsed,calendarDaysSinceEvidence:days!==null&&days>=0?days:null,
+      narrativeDayChangesSinceEvidence:narrativeDays,dayCountUncertain:!first||!clock.current||first.daySegment!==clock.current.daySegment||clock.messageStarts.get(source)?.storyDay!==first.storyDay};
   });
 }
 
 export function validateTimelineContext(value, ids) {
   const check=condition=>{if(!condition)throw Object.assign(new Error('Invalid timeline context.'),{code:'invalid'});};
-  const shape=(v,keys)=>check(v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k)));
-  const point=p=>{if(p===null)return;shape(p,['segment','minute','date','time','label','sourceId','sources','origin']);check(ids.has(p.segment)&&ids.has(p.sourceId)&&Number.isFinite(p.minute)&&p.minute>=0);validateTimeStep({advanceMinutes:0,date:p.date,time:p.time,label:p.label,sources:p.sources,origin:p.origin},ids,true);};
-  shape(value,['current','evidence','evidenceLimit','coverage']);point(value.current);check(value.coverage==='explicit-checkpoints-only'&&value.evidenceLimit===64&&Array.isArray(value.evidence)&&value.evidence.length<=64);
-  for(const e of value.evidence){shape(e,['recordId','sourceId','firstEvidencedAt','minutesSinceEvidence','calendarDaysSinceEvidence']);check(typeof e.recordId==='string'&&e.recordId.length<=100&&(e.sourceId===null||ids.has(e.sourceId)));point(e.firstEvidencedAt);for(const k of ['minutesSinceEvidence','calendarDaysSinceEvidence'])check(e[k]===null||(Number.isFinite(e[k])&&e[k]>=0));}
+  const shape=(v,keys,optional=[])=>check(v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k)||optional.includes(k))&&keys.every(k=>Object.hasOwn(v,k)));
+  const point=p=>{if(p===null)return;shape(p,['segment','minute','date','time','label','sourceId','sources','origin'],['storyDay','daySegment','dayPhase','dayConfidence','dayUncertain']);check(ids.has(p.segment)&&ids.has(p.sourceId)&&Number.isFinite(p.minute)&&p.minute>=0);validateTimeStep({advanceMinutes:0,date:p.date,time:p.time,label:p.label,sources:p.sources,origin:p.origin},ids,true);if(p.storyDay!==undefined)check(Number.isSafeInteger(p.storyDay)&&p.storyDay>=1&&ids.has(p.daySegment)&&['unknown','morning','afternoon','evening','night'].includes(p.dayPhase)&&['inferred','dated','explicit'].includes(p.dayConfidence)&&typeof p.dayUncertain==='boolean');};
+  shape(value,['current','evidence','evidenceLimit','coverage'],['historicalEvidence']);point(value.current);check(['explicit-checkpoints-only','narrative-day-inference'].includes(value.coverage)&&value.evidenceLimit===64&&Array.isArray(value.evidence)&&value.evidence.length<=64);
+  for(const e of value.evidence){shape(e,['recordId','sourceId','firstEvidencedAt','minutesSinceEvidence','calendarDaysSinceEvidence'],['narrativeDayChangesSinceEvidence','dayCountUncertain']);check(typeof e.recordId==='string'&&e.recordId.length<=100&&(e.sourceId===null||ids.has(e.sourceId)));point(e.firstEvidencedAt);for(const k of ['minutesSinceEvidence','calendarDaysSinceEvidence','narrativeDayChangesSinceEvidence'])if(e[k]!==undefined)check(e[k]===null||(Number.isFinite(e[k])&&e[k]>=0));if(e.dayCountUncertain!==undefined)check(typeof e.dayCountUncertain==='boolean');}
+  if(value.historicalEvidence!==undefined){check(Array.isArray(value.historicalEvidence)&&value.historicalEvidence.length<=6);for(const e of value.historicalEvidence){shape(e,['sourceId','text','startStoryDay','endStoryDay','dayChangesSinceEvidence','uncertain']);check(ids.has(e.sourceId)&&typeof e.text==='string'&&e.text.length<=1800&&typeof e.uncertain==='boolean');for(const k of ['startStoryDay','endStoryDay','dayChangesSinceEvidence'])check(e[k]===null||(Number.isSafeInteger(e[k])&&e[k]>=0));}}
 }

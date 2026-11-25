@@ -24,7 +24,7 @@ test('legacy personas acquire defaults on read while legacy story snapshots stay
   const c=a.createCharacter({name:'Ash',definition:'Adult.'}),p=a.createPersona({name:'River',definition:'Adult.'}),s=a.createStory({characterId:c.id,personaId:p.id,title:'Legacy'});
   const backup=exportData(a);for(const e of backup.library)if(e.type==='persona')for(const k of ['cover','focalPoint','likes','dislikes','age','gender'])delete e.data[k];
   for(const k of ['cover','focalPoint','likes','dislikes','age','gender'])delete backup.stories[0].persona[k];
-  importData(b,backup);assert.equal(b.definition(p.id,'persona').age,null);assert.equal(b.definition(p.id,'persona').likes,'');const {timeline,...restored}=b.load(s.id);assert.deepEqual(restored,backup.stories[0]);assert.deepEqual(timeline,{version:1,points:[]});
+  importData(b,backup);assert.equal(b.definition(p.id,'persona').age,null);assert.equal(b.definition(p.id,'persona').likes,'');const {timeline,...restored}=b.load(s.id);assert.deepEqual(restored,backup.stories[0]);assert.deepEqual(timeline,{version:2,points:[]});
  }finally{a.close();b.close();}
 });
 

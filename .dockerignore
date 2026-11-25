@@ -8,6 +8,7 @@ app/**
 !app/store.mjs
 !app/context.mjs
 !app/timeline.mjs
+!app/narrative-time.mjs
 !app/provider.mjs
 !app/transfer.mjs
 !app/item-transfer.mjs

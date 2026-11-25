@@ -1,5 +1,6 @@
 // Durable state is not a prompt. Select evidence without mutating stored records.
 import { timelineContext, evidenceTimes, RELATIVE_ORIGIN_LABEL } from './timeline.mjs';
+import {recallTimeEvidence,rankTimeEntries} from './narrative-time.mjs';
 export const CONTEXT_CHARACTERS = 120000;
 export const CONTEXT_BYTES = 128000;
 const normalize = value => value.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
@@ -10,7 +11,8 @@ const project = entry => ({...structuredClone(entry), sources: [...new Set(entry
 export function selectContext(story, context, replySourceId) {
   const clock=timelineContext(story);
   const storedEntries=new Map(['threads','memories','relationship'].flatMap(k=>story[k].map(e=>[e.id,e])));
-  context.timeline={current:clock.current,evidence:[],evidenceLimit:64,coverage:'explicit-checkpoints-only'};
+  context.timeline={current:clock.current,evidence:[],evidenceLimit:64,coverage:'narrative-day-inference',historicalEvidence:recallTimeEvidence(story,clock,context.messages.at(-1)?.text??'')};
+  while(Buffer.byteLength(JSON.stringify(context.timeline.historicalEvidence))>8000)context.timeline.historicalEvidence.pop();
   const thoughtIds = new Set(story.messages.filter(m => m.kind === 'thought').map(m => m.id));
   context.memories = [];
   context.threads = [];
@@ -25,7 +27,7 @@ export function selectContext(story, context, replySourceId) {
   // must not authorize citing an otherwise unselected historical message.
   const timeSources=point=>point?.label===RELATIVE_ORIGIN_LABEL?[]:(point?.sources??[]);
   const refreshSources = () => {
-    context.timeline.evidence=evidenceTimes([...context.threads,...context.memories,...context.relationship].map(e=>storedEntries.get(e.id)??e),clock);
+    context.timeline.evidence=evidenceTimes(rankTimeEntries([...context.threads,...context.memories,...context.relationship].map(e=>storedEntries.get(e.id)??e),context.messages.at(-1)?.text??''),clock);
     while(Buffer.byteLength(JSON.stringify(context.timeline.evidence))>8000)context.timeline.evidence.pop();
     context.sourceIds = [...new Set([
       ...context.messages.map(m => m.id),
@@ -34,6 +36,7 @@ export function selectContext(story, context, replySourceId) {
       ...timeSources(clock.current),
       ...context.timeline.evidence.flatMap(e=>e.sourceId?[e.sourceId]:[]),
       ...context.timeline.evidence.flatMap(e=>timeSources(e.firstEvidencedAt)),
+      ...context.timeline.historicalEvidence.map(e=>e.sourceId),
     ])].filter(id => !thoughtIds.has(id));
     if (replySourceId) context.sourceIds.push(replySourceId);
   };

@@ -45,7 +45,7 @@ function story(v) {
 function validateContext(c,v,ids,reservedId){
   const messageById=new Map(v.messages.map(m=>[m.id,m]));
   text(c.instructions,4000);check(Array.isArray(c.messages)&&c.messages.length<=12);check(Array.isArray(c.sourceIds)&&c.sourceIds.length<=Math.max(5000,ids.size+(reservedId?1:0))&&c.sourceIds.every(id=>(ids.has(id)&&messageById.get(id)?.kind!=='thought')||id===reservedId));
-  if(c.timeline!==undefined)validateTimelineContext(c.timeline,ids);
+  if(c.timeline!==undefined){validateTimelineContext(c.timeline,new Set([...ids].filter(id=>messageById.get(id)?.kind!=='thought')));for(const e of c.timeline.historicalEvidence??[])check(messageById.get(e.sourceId)?.text.includes(e.text));}
   const {instructions,sourceIds,replySourceId,timeline,...state}=c;story({...v,...state,messages:v.messages,generations:[],thoughtRequests:[]});
   // Legacy six-message contexts could exceed the new budget; preserve historical backups.
   check(c.messages.reduce((n,m)=>n+(typeof m.text==='string'?m.text.length:0),0)<=(c.replySourceId!==undefined||c.messages.length>6?24000:72000));

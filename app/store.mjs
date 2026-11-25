@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { selectContext } from './context.mjs';
-import { buildTimeline, timeStepSchema, validateTimeStep } from './timeline.mjs';
+import { buildTimeline, timeStepSchema, validateTimeStep, TIMELINE_VERSION } from './timeline.mjs';
 
 const kinds = ['fact', 'belief', 'event'];
 const statuses = ['pending', 'completed', 'cancelled', 'superseded'];
@@ -85,7 +85,7 @@ export class Store {
     this.transaction(() => {
       for (const row of this.db.prepare('SELECT data FROM stories').all()) {
         const story = JSON.parse(row.data); let changed = false;
-        if(story.timeline?.version!==1)changed=true;
+        if(story.timeline?.version!==TIMELINE_VERSION)changed=true;
         for(const request of story.thoughtRequests??[])if(request.status==='pending'){request.status='interrupted';request.error='interrupted';changed=true;}
         for (const generation of story.generations) if (generation.status === 'pending') { generation.status = 'interrupted'; generation.error = 'interrupted'; changed = true; }
         if (changed) this.save(story);

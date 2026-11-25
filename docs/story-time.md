@@ -1,5 +1,7 @@
 # Fictional time and historical reconstruction
 
+Current behavior: version 2 also reconstructs relative days from ordered narrative sleep/wake and day-part cues, and retrieves older activity passages for elapsed-time questions. It automatically rebuilds version-1 timelines on startup. See [narrative day reconstruction](narrative-time-reconstruction.md). The version-1 implementation and release evidence below describe the initial, narrower backfill.
+
 Implemented locally on 2026-11-25. No live inference, publication, deployment or production-data migration was performed.
 
 ## Behavior
