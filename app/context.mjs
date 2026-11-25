@@ -1,4 +1,5 @@
 // Durable state is not a prompt. Select evidence without mutating stored records.
+import { timelineContext, evidenceTimes, RELATIVE_ORIGIN_LABEL } from './timeline.mjs';
 export const CONTEXT_CHARACTERS = 120000;
 export const CONTEXT_BYTES = 128000;
 const normalize = value => value.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
@@ -7,6 +8,9 @@ const stopwords = new Set('the and that this with from have what would about you
 const project = entry => ({...structuredClone(entry), sources: [...new Set(entry.sources)].slice(-16)});
 
 export function selectContext(story, context, replySourceId) {
+  const clock=timelineContext(story);
+  const storedEntries=new Map(['threads','memories','relationship'].flatMap(k=>story[k].map(e=>[e.id,e])));
+  context.timeline={current:clock.current,evidence:[],evidenceLimit:64,coverage:'explicit-checkpoints-only'};
   const thoughtIds = new Set(story.messages.filter(m => m.kind === 'thought').map(m => m.id));
   context.memories = [];
   context.threads = [];
@@ -17,11 +21,19 @@ export function selectContext(story, context, replySourceId) {
   context.summary = '';
   if (context.scene) context.scene = project(context.scene);
   if (replySourceId) context.replySourceId = replySourceId;
+  // A conventional relative origin contains no selected narrative evidence and
+  // must not authorize citing an otherwise unselected historical message.
+  const timeSources=point=>point?.label===RELATIVE_ORIGIN_LABEL?[]:(point?.sources??[]);
   const refreshSources = () => {
+    context.timeline.evidence=evidenceTimes([...context.threads,...context.memories,...context.relationship].map(e=>storedEntries.get(e.id)??e),clock);
+    while(Buffer.byteLength(JSON.stringify(context.timeline.evidence))>8000)context.timeline.evidence.pop();
     context.sourceIds = [...new Set([
       ...context.messages.map(m => m.id),
       ...['memories','threads','relationship','thoughts'].flatMap(key => context[key].flatMap(m => m.sources)),
       ...(context.scene?.sources ?? []),
+      ...timeSources(clock.current),
+      ...context.timeline.evidence.flatMap(e=>e.sourceId?[e.sourceId]:[]),
+      ...context.timeline.evidence.flatMap(e=>timeSources(e.firstEvidencedAt)),
     ])].filter(id => !thoughtIds.has(id));
     if (replySourceId) context.sourceIds.push(replySourceId);
   };

@@ -7,6 +7,7 @@ app/**
 !app/server.mjs
 !app/store.mjs
 !app/context.mjs
+!app/timeline.mjs
 !app/provider.mjs
 !app/transfer.mjs
 !app/item-transfer.mjs

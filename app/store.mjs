@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { selectContext } from './context.mjs';
+import { buildTimeline, timeStepSchema, validateTimeStep } from './timeline.mjs';
 
 const kinds = ['fact', 'belief', 'event'];
 const statuses = ['pending', 'completed', 'cancelled', 'superseded'];
@@ -46,13 +47,14 @@ export const outputSchema = recordSchema({
   relationship: listSchema(recordSchema(common)),
   thoughts: listSchema(recordSchema(common)),
   scene: { anyOf: [{ type: 'null' }, recordSchema({ text: stringSchema(2000), fictionalTime: stringSchema(200), sources: sourcesSchema })] },
+  storyTime: {anyOf:[{type:'null'},timeStepSchema]},
 });
 
 export const thoughtOutputSchema = recordSchema({text:stringSchema(2000),sources:sourcesSchema});
 export function validateThoughtOutput(output,sourceIds){object(output,['text','sources']);text(output.text);check(Array.isArray(output.sources)&&output.sources.length>0&&output.sources.length<=16&&output.sources.every(s=>sourceIds.includes(s)),'Unknown thought source.');return copy(output);}
 
 export function validateOutput(output, sourceIds) {
-  object(output, ['reply', 'memories', 'threads', 'relationship', 'thoughts', 'scene']);
+  object(output, ['reply', 'memories', 'threads', 'relationship', 'thoughts', 'scene','storyTime'], ['reply', 'memories', 'threads', 'relationship', 'thoughts', 'scene']);
   text(output.reply, 12000);
   const allowed = new Set(sourceIds);
   const sources = value => { check(Array.isArray(value) && value.length >= 1 && value.length <= 16 && value.every(source => typeof source === 'string' && allowed.has(source)), 'Unknown or missing source message.'); };
@@ -70,6 +72,7 @@ export function validateOutput(output, sourceIds) {
     }
   }
   if (output.scene !== null) { object(output.scene, ['text', 'fictionalTime', 'sources']); text(output.scene.text); text(output.scene.fictionalTime, 200); sources(output.scene.sources); }
+  if(output.storyTime!=null)validateTimeStep(output.storyTime,sourceIds);
   return copy(output);
 }
 
@@ -82,6 +85,7 @@ export class Store {
     this.transaction(() => {
       for (const row of this.db.prepare('SELECT data FROM stories').all()) {
         const story = JSON.parse(row.data); let changed = false;
+        if(story.timeline?.version!==1)changed=true;
         for(const request of story.thoughtRequests??[])if(request.status==='pending'){request.status='interrupted';request.error='interrupted';changed=true;}
         for (const generation of story.generations) if (generation.status === 'pending') { generation.status = 'interrupted'; generation.error = 'interrupted'; changed = true; }
         if (changed) this.save(story);
@@ -89,7 +93,12 @@ export class Store {
     });
   }
   transaction(fn) { this.db.exec('BEGIN IMMEDIATE'); try { const result = fn(); this.db.exec('COMMIT'); return result; } catch (failure) { this.db.exec('ROLLBACK'); throw failure; } }
-  save(story) { this.db.prepare('INSERT OR REPLACE INTO stories(id,data) VALUES(?,?)').run(story.id, JSON.stringify(story)); }
+  save(story) {
+    const invalidUsers=new Set(story.generations.filter(g=>['failed','interrupted'].includes(g.status)).map(g=>g.userMessageId));
+    for(const message of story.messages)if(invalidUsers.has(message.id))message.storyTime=null;
+    story.timeline=buildTimeline(story);
+    this.db.prepare('INSERT OR REPLACE INTO stories(id,data) VALUES(?,?)').run(story.id, JSON.stringify(story));
+  }
   load(storyId) { const row = this.db.prepare('SELECT data FROM stories WHERE id=?').get(storyId); if (!row) throw error('not_found', 'Story not found.'); return JSON.parse(row.data); }
   publicStory(story) { const result = copy(story); delete result.suppression;for(const request of result.thoughtRequests??[])delete request.context; for (const generation of result.generations) { delete generation.context; delete generation.baseSnapshot; } return result; }
   getStory(storyId) { return this.publicStory(this.load(storyId)); }
@@ -263,10 +272,10 @@ export class Store {
         if (suppressed(proposal)) continue;
         const existing = story[category].find(m => normalized(m.key) === normalized(proposal.key));
         if (category === 'threads' && existing && existing.status !== 'pending' && proposal.status === 'pending') continue;
-        if (existing) Object.assign(existing, proposal, { revision }); else story[category].push({ ...proposal, id: id(), revision });
+        if (existing) {if(category==='threads')existing.originSources??=copy(existing.sources);Object.assign(existing, proposal, { revision });} else story[category].push({ ...proposal, ...(category==='threads'?{originSources:copy(proposal.sources)}:{}), id: id(), revision });
       }
       if (output.scene && !story.suppression.some(s => normalized(`${output.scene.text} ${output.scene.fictionalTime}`).includes(s.text))) story.scene = { ...output.scene, revision };
-      story.messages.push({ id: generation.assistantMessageId ?? id(), role: 'assistant', text: output.reply, createdAt: now(), generationId });
+      story.messages.push({ id: generation.assistantMessageId ?? id(), role: 'assistant', text: output.reply, createdAt: now(), generationId, storyTime:output.storyTime?{...output.storyTime,origin:'model'}:null });
       generation.status = 'completed'; generation.completedAt = now(); story.revision = revision; this.summarize(story);
     });
   }
