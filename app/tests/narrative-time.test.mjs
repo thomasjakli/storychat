@@ -95,7 +95,7 @@ test('v1 startup is rebuilt from all narrative text, including replies with null
   story.timeline={version:1,points:[]};story.memories=[{id:'protected',kind:'fact',key:'repair',text:'The original telescope belongs to the observatory.',sources:['onset'],revision:0,pinned:true,corrected:true}];
   store.db.prepare('UPDATE stories SET data=? WHERE id=?').run(JSON.stringify(story),id);
   store.close();store=new Store(path);
-  const result=store.load(id);assert.equal(result.timeline.version,2);assert.equal(result.timeline.points.at(-1).storyDay,4);
+  const result=store.load(id);assert.equal(result.timeline.version,3);assert.equal(result.timeline.points.at(-1).storyDay,4);
   assert.deepEqual(result.messages,story.messages);assert.deepEqual(result.memories,story.memories);assert.equal(result.revision,story.revision);
   const attempt=store.beginTurn(id,{requestId:'time-question',text:'Wie viele Tage arbeite ich schon am Teleskop, seit ich die Teile ausgebreitet habe?'});
   const evidence=attempt.context.timeline.historicalEvidence.find(e=>e.sourceId==='onset');

@@ -1,5 +1,7 @@
 # Narrative day reconstruction, version 2
 
+Version 3 supersedes this implementation's cue exclusions and activity-start ranking. It automatically rebuilds version-2 caches. See [morning and activity-start correction](temporal-reconstruction-v3.md) for current behavior and verification.
+
 Owner feedback after the first chronology release: explicit-marker backfill missed ordinary narrative evenings, sleep and waking. Replies could not count days since a particular activity started, despite those transitions appearing in the full transcript. Version 2 addresses both reconstruction and retrieval. The private feedback screenshots are not shipped fixtures.
 
 ## Existing chats on startup

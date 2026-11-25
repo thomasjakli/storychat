@@ -1,6 +1,6 @@
 // Durable state is not a prompt. Select evidence without mutating stored records.
 import { timelineContext, evidenceTimes, RELATIVE_ORIGIN_LABEL } from './timeline.mjs';
-import {recallTimeEvidence,rankTimeEntries} from './narrative-time.mjs';
+import {recallTimeEvidence,rankTimeEntries,activityStartSource} from './narrative-time.mjs';
 export const CONTEXT_CHARACTERS = 120000;
 export const CONTEXT_BYTES = 128000;
 const normalize = value => value.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
@@ -13,6 +13,7 @@ export function selectContext(story, context, replySourceId) {
   const storedEntries=new Map(['threads','memories','relationship'].flatMap(k=>story[k].map(e=>[e.id,e])));
   context.timeline={current:clock.current,evidence:[],evidenceLimit:64,coverage:'narrative-day-inference',historicalEvidence:recallTimeEvidence(story,clock,context.messages.at(-1)?.text??'')};
   while(Buffer.byteLength(JSON.stringify(context.timeline.historicalEvidence))>8000)context.timeline.historicalEvidence.pop();
+  context.timeline.activityStartSourceId=activityStartSource(context.timeline.historicalEvidence,context.messages.at(-1)?.text??'');
   const thoughtIds = new Set(story.messages.filter(m => m.kind === 'thought').map(m => m.id));
   context.memories = [];
   context.threads = [];
