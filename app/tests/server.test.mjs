@@ -73,3 +73,12 @@ test('startup port conflict releases database lock instead of stranding the runt
   const recoveredLock=await acquireRuntimeLock(db+'.lock'); await recoveredLock.release();
   const reopened=new Store(db); assert.equal(reopened.library().stories.length,0); reopened.close();
 });
+
+test('lore HTTP requires owner authentication and persists without inference',async t=>{
+ const f=await fixture(t);const path=`/api/stories/${f.story.id}/lore/guild`,entry={revision:0,title:'Guild',text:'界'.repeat(12000)};
+ assert.equal((await f.request(path,'PUT',entry)).status,401);await f.login();
+ assert.equal((await f.request(path,'PUT',entry,{Origin:'https://attacker.invalid'})).status,403);
+ const saved=await f.request(path,'PUT',entry);assert.equal(saved.status,200);assert.equal(saved.data.lore.length,1);assert.equal(f.calls(),0);
+ assert.equal((await f.request(path,'PUT',{...entry,text:'Changed'})).status,409);
+ assert.equal((await f.request(path,'DELETE',{revision:1})).data.lore.length,0);
+});

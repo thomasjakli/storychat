@@ -173,12 +173,13 @@ export function createApplication({store, provider, password, origin, secureCook
         }
         const creates = {'/api/characters':'createCharacter','/api/personas':'createPersona','/api/stories':'createStory'};
         if (req.method === 'POST' && creates[path]) {const data=await body(req,131072);if(['/api/characters','/api/personas'].includes(path) && data.cover){if(!media)throw fail('invalid','Media unavailable.');await media.metadata(data.cover);}return send(res,201,store[creates[path]](data));}
-        const match = /^\/api\/stories\/([a-zA-Z0-9-]+)(?:\/(controls|turns|memories|thoughts)(?:\/([a-zA-Z0-9-]+))?)?$/.exec(path);
+        const match = /^\/api\/stories\/([a-zA-Z0-9-]+)(?:\/(controls|turns|memories|thoughts|lore)(?:\/([a-zA-Z0-9-]+))?)?$/.exec(path);
         if (!match) return send(res,404,{error:{code:'not_found',message:'Route not found.'}});
         const [,id,action,memoryId]=match;
         if (req.method === 'GET' && !action) return send(res,200,store.getStory(id));
         if (req.method === 'DELETE' && !action) { if (active) throw fail('conflict','A generation is pending.'); store.deleteStory(id); return send(res,200,{deleted:true}); }
         if (req.method === 'PATCH' && action === 'controls') return send(res,200,store.setControls(id,await body(req)));
+        if (action === 'lore' && memoryId && ['PUT','DELETE'].includes(req.method)) return send(res,200,store.setLore(id,memoryId,await body(req,65536),req.method==='DELETE'));
         if (action === 'memories' && memoryId && req.method === 'PATCH') return send(res,200,store.editMemory(id,memoryId,await body(req)));
         if (action === 'memories' && memoryId && req.method === 'DELETE') return send(res,200,store.deleteMemory(id,memoryId));
         if(action==='thoughts') {

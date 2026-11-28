@@ -84,6 +84,7 @@ async function api(path, options = {}) {
 function stopPolling() { clearTimeout(state.poll); state.poll = null; }
 function lockView() {
   state.sessionEpoch += 1;
+  loreEditor=null;loreDrafts.clear();$('lore-form').reset();$('lore-list').replaceChildren();
   stopPolling(); unconfirmedThought=null; state.session = null; state.story = null; state.library = null; state.sendRequest = null;
   $('messages').replaceChildren(); $('state-content').replaceChildren(); $('story-list').replaceChildren();$('character-grid').replaceChildren();$('character-detail').replaceChildren();$('definition-form').reset();
   if(typeof clearPersonaView==='function')clearPersonaView();
@@ -713,7 +714,7 @@ const smaller=button('Decrease text size','quiet',()=>setChatSize(chatSizes[Math
 readingButtons.append(smaller,sizeLabel,larger,resetSize);reading.append(readingTitle,readingButtons);$('settings-tools').append(reading);
 function setChatSize(value){const following=innerHeight+scrollY>=document.documentElement.scrollHeight-100;const anchor=[...document.querySelectorAll('#messages .message')].find(n=>n.getBoundingClientRect().bottom>0),top=anchor?.getBoundingClientRect().top;chatSize=value;try{localStorage.setItem(chatSizeKey,String(value));}catch{}applyChatSize();requestAnimationFrame(()=>{if(state.view!=='story-view')return;if(following)window.scrollTo(0,document.documentElement.scrollHeight);else if(anchor?.isConnected)window.scrollBy(0,anchor.getBoundingClientRect().top-top);});}
 function applyChatSize(){document.documentElement.style.setProperty('--chat-text-scale',String(chatSize/100));sizeLabel.textContent=chatSize+'%';smaller.disabled=chatSize===85;larger.disabled=chatSize===150;}applyChatSize();
-const thoughtBar=el('section','thought-controls'),thoughtGenerate=button('Generate inner thought','quiet',()=>generateThought()),thoughtStatus=el('p','hint'),thoughtCancel=button('Cancel thought generation','quiet',()=>cancelThought());thoughtStatus.setAttribute('role','status');const thoughtCheck=button('Check thought status','quiet',async()=>{try{const checkId=state.story?.id;await refreshStory();if(state.story?.id!==checkId||unconfirmedThought?.storyId!==checkId)return;if(unconfirmedThought&&!state.story?.thoughtRequests?.some(r=>r.requestId===unconfirmedThought.requestId))unconfirmedThought=null;renderThoughtControls();}catch(e){showNotice(e.message,true);}});const toolsMenu=actionMenu('Story actions',[thoughtGenerate]);toolsMenu.id='story-tools';const toolsSummary=toolsMenu.querySelector('summary');toolsSummary.classList.add('icon-button');toolsSummary.setAttribute('aria-label','Story actions');toolsSummary.setAttribute('title','Story actions');toolsSummary.textContent='';$('composer-tools').append(toolsMenu);thoughtBar.append(thoughtCheck,thoughtStatus,thoughtCancel);$('composer-status').append(thoughtBar,$('generation-status'));
+const thoughtBar=el('section','thought-controls'),thoughtGenerate=button('Generate inner thought','quiet',()=>generateThought()),thoughtStatus=el('p','hint'),thoughtCancel=button('Cancel thought generation','quiet',()=>cancelThought());thoughtStatus.setAttribute('role','status');const thoughtCheck=button('Check thought status','quiet',async()=>{try{const checkId=state.story?.id;await refreshStory();if(state.story?.id!==checkId||unconfirmedThought?.storyId!==checkId)return;if(unconfirmedThought&&!state.story?.thoughtRequests?.some(r=>r.requestId===unconfirmedThought.requestId))unconfirmedThought=null;renderThoughtControls();}catch(e){showNotice(e.message,true);}});const toolsMenu=actionMenu('Story actions',[button('Add Lore','quiet',openLore),thoughtGenerate]);toolsMenu.id='story-tools';const toolsSummary=toolsMenu.querySelector('summary');toolsSummary.classList.add('icon-button');toolsSummary.setAttribute('aria-label','Story actions');toolsSummary.setAttribute('title','Story actions');toolsSummary.textContent='';$('composer-tools').append(toolsMenu);thoughtBar.append(thoughtCheck,thoughtStatus,thoughtCancel);$('composer-status').append(thoughtBar,$('generation-status'));
 let thoughtActionBusy=false,unconfirmedThought=null;
 function unknownThoughtHere(){return !!unconfirmedThought&&unconfirmedThought.storyId===state.story?.id;}
 function renderThoughtControls(){const pending=state.story?.thoughtRequests?.find(r=>r.status==='pending'),last=state.story?.thoughtRequests?.at(-1);thoughtGenerate.disabled=state.busy||isGenerating()||thoughtActionBusy||unknownThoughtHere();thoughtCheck.hidden=!unknownThoughtHere();thoughtCancel.hidden=!pending;thoughtCancel.disabled=thoughtActionBusy;thoughtStatus.textContent=pending?t('Writing a fictional thought…'):unknownThoughtHere()?t('Thought request could not be confirmed. Check saved status before trying again.'):last&&['failed','interrupted','cancelled'].includes(last.status)?t('Thought generation did not complete. No partial thought was added.') : '';for(const n of document.querySelectorAll('.thought-actions button'))n.disabled=state.busy||isGenerating()||thoughtActionBusy||unknownThoughtHere();}
@@ -738,3 +739,73 @@ if(document.readyState!=='complete')document.addEventListener('DOMContentLoaded'
 // Preserve the last continuously recorded reading anchor through that transition.
 $('app-nav').addEventListener('click',()=>{if(state.view==='story-view'){leavingReading=true;clearTimeout(readingSaveTimer);}},{capture:true});
 $('back').addEventListener('click',()=>{leavingReading=true;clearTimeout(readingSaveTimer);},{capture:true});
+
+// Lore drafts are page-session editor state, never provider context.
+const loreDrafts=new Map();
+let loreEditor=null, loreBusy=false;
+function loreDraftKey(storyId,entryId){return storyId+'/'+entryId;}
+function rememberLoreDraft(){
+  if(!loreEditor||loreEditor.storyId!==state.story?.id)return;
+  const draft={...loreEditor,title:$('lore-title').value,text:$('lore-text').value};
+  const saved=state.story.lore?.find(e=>e.id===draft.id);
+  const key=loreDraftKey(draft.storyId,draft.id);
+  if(saved ? saved.title===draft.title&&saved.text===draft.text : !draft.title&&!draft.text)loreDrafts.delete(key);
+  else loreDrafts.set(key,draft);
+}
+function selectLoreEntry(entry=null){
+  const savedDraft=entry&&loreDrafts.get(loreDraftKey(state.story.id,entry.id));
+  loreEditor=savedDraft?{storyId:savedDraft.storyId,id:savedDraft.id,revision:savedDraft.revision}:{storyId:state.story.id,id:entry?.id??newRequestId(),revision:state.story.revision};
+  $('lore-title').value=savedDraft?.title??entry?.title??'';
+  $('lore-text').value=savedDraft?.text??entry?.text??'';
+  updateLoreCounters();renderLoreList();
+}
+function openLore(){
+  if(!state.story)return;
+  if(loreEditor?.storyId!==state.story.id)selectLoreEntry();
+  // Refresh the revision only when the editor has no unsaved changes.
+  if(!loreDrafts.has(loreDraftKey(loreEditor.storyId,loreEditor.id)))loreEditor.revision=state.story.revision;
+  $('lore-error').hidden=true;renderLoreList();$('lore-dialog').showModal();
+}
+function renderLoreList(){
+  if(!state.story)return;
+  $('lore-list').replaceChildren();
+  const entries=[...(state.story.lore??[])];
+  for(const draft of loreDrafts.values())if(draft.storyId===state.story.id&&!entries.some(e=>e.id===draft.id))entries.push(draft);
+  for(const entry of entries){
+    const draft=loreDrafts.get(loreDraftKey(state.story.id,entry.id));
+    const row=el('div','lore-row'),identity=el('div','lore-identity');
+    identity.append(contentEl('strong','',draft?.title||entry.title||t('Untitled lore')),el('span','lore-status',t(draft?'Draft':'Saved')));
+    row.append(identity,
+      button('Edit','quiet',()=>{if(loreBusy)return;rememberLoreDraft();selectLoreEntry(entry);$('lore-title').focus();}),
+      button('Remove','quiet',()=>{if(!loreBusy&&uiConfirm('Remove this lore?'))saveLore(true,entry.id);}));$('lore-list').append(row);
+  }
+}
+$('lore-close').addEventListener('click',()=>$('lore-dialog').close());
+$('lore-dialog').addEventListener('close',()=>{if(state.view==='story-view')toolsSummary.focus({preventScroll:true});});
+$('lore-new').addEventListener('click',()=>{if(loreBusy)return;rememberLoreDraft();selectLoreEntry();$('lore-title').focus();});
+$('lore-form').addEventListener('input',()=>{rememberLoreDraft();renderLoreList();});
+$('lore-form').addEventListener('submit',event=>{event.preventDefault();saveLore();});
+async function saveLore(remove=false,entryId=loreEditor?.id){
+  if(loreBusy||!loreEditor||state.story?.id!==loreEditor.storyId)return;
+  rememberLoreDraft();
+  const editor={...loreEditor},session=state.sessionEpoch,epoch=storyNavigationEpoch;
+  // Removing an unsaved new entry needs no server mutation.
+  if(remove&&!state.story.lore?.some(e=>e.id===entryId)){
+    loreDrafts.delete(loreDraftKey(editor.storyId,entryId));
+    if(entryId===editor.id)selectLoreEntry();else renderLoreList();return;
+  }
+  loreBusy=true;$('lore-error').hidden=true;
+  for(const b of $('lore-dialog').querySelectorAll('button,input,textarea'))b.disabled=true;
+  try{
+    const data={revision:editor.revision};if(!remove){data.title=$('lore-title').value.trim();data.text=$('lore-text').value.trim();}
+    const updated=await api(`/api/stories/${editor.storyId}/lore/${entryId}`,{method:remove?'DELETE':'PUT',body:JSON.stringify(data)});
+    if(session!==state.sessionEpoch||epoch!==storyNavigationEpoch||state.story?.id!==editor.storyId)return;
+    state.story=updated;renderStory();loreDrafts.delete(loreDraftKey(editor.storyId,entryId));
+    for(const draft of loreDrafts.values())if(draft.storyId===editor.storyId)draft.revision=updated.revision;
+    if(!remove||entryId===editor.id)selectLoreEntry();else {loreEditor.revision=updated.revision;renderLoreList();}
+    showNotice(remove?'Lore removed.':'Lore saved.');
+  }catch(error){if(session===state.sessionEpoch&&epoch===storyNavigationEpoch){$('lore-error').textContent=t(error.message);$('lore-error').hidden=false;}}
+  finally{loreBusy=false;for(const b of $('lore-dialog').querySelectorAll('button,input,textarea'))b.disabled=false;}
+}
+function updateLoreCounters(){for(const input of $('lore-form').querySelectorAll('[maxlength]'))input.dispatchEvent(new Event('change'));}
+$('lore-form').addEventListener('reset',()=>queueMicrotask(updateLoreCounters));

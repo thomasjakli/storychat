@@ -49,3 +49,7 @@ Object.assign(german,{
   'Return to reading position':'Zur Leseposition zurück','Send':'Senden'
 });
 Object.assign(german,{'Previous page':'Vorherige Seite','Next page':'Nächste Seite','Story details':'Details zur Geschichte','DEMO':'DEMO'});
+
+Object.assign(german,{'Add Lore':'Lore hinzufügen','Story lore':'Geschichten-Lore','Close lore':'Lore schließen','Title':'Titel','Background':'Hintergrund','Save lore':'Lore speichern','New entry':'Neuer Eintrag','Remove this lore?':'Diese Lore entfernen?','Lore removed.':'Lore entfernt.','Lore saved.':'Lore gespeichert.','Story changed or a reply is pending. Reload before saving lore.':'Die Geschichte wurde geändert oder eine Antwort steht aus. Öffne die Lore erneut, bevor du speicherst.','Lore capacity reached (24 entries, 16,000 characters total).':'Lore-Limit erreicht (24 Einträge, insgesamt 16.000 Zeichen).'});
+
+Object.assign(german,{'Saved':'Gespeichert','Untitled lore':'Lore ohne Titel','Lore capacity reached (24 entries, 24,000 characters total).':'Lore-Limit erreicht (24 Einträge, insgesamt 24.000 Zeichen).'});
